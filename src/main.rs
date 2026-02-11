@@ -18,7 +18,7 @@ use sw8s_rust_lib::{
         basic::descend_and_go_forward,
         bin::bin,
         coinflip::coinflip_procedural,
-        example::{initial_descent, pid_test},
+        example::{initial_descent, pid_test, zed_test},
         fire_torpedo::{FireLeftTorpedo, FireRightTorpedo},
         gate::{gate_run_cv_procedural, gate_run_dead_reckon, gate_run_procedural},
         meb::WaitArm,
@@ -495,6 +495,7 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
             Ok(())
         }
         "bin" => ctwrap!(bin(static_context().await)),
+        "zed_test" => ctwrap!(zed_test(static_context().await)),
         x => bail!("Invalid argument: [{x}]"),
     };
 

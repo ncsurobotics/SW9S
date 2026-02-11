@@ -2,7 +2,6 @@
 name = "sw8s_rust"
 version = "0.1.0"
 edition = "2021"
-build = "build.rs"
 default-run = "sw8s_rust"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -21,7 +20,7 @@ path = "src/graph_main.rs"
 required-features = ["graphing"]
 
 [features]
-default = []
+default = ["logging"]
 logging = []
 annotated_streams = ["logging"]
 #unblocked_logging = ["logging"]
@@ -70,13 +69,6 @@ cc = { version = "1.0.99", optional = true }
 assert_approx_eq = "1.1.0" # Floating point eq
 criterion = { version = "0.5.1", features = ["async_tokio"] } # Benchmarking
 rayon = "1.10.0"
-
-[profile.bench]
-debug = true
-
-[[bench]]
-name = "model_processing"
-harness = false
 
 [target.'cfg(target_os = "linux")'.dev-dependencies]
 flate2 = "1.0.30" # Decompressing gz

@@ -24,9 +24,10 @@ const CONTROL_BOARD_BACKUP_PATH: &str = "/dev/ttyACM3";
 const MEB_PATH: &str = "/dev/ttyACM2";
 const FRONT_CAM: &str = "/dev/video0";
 const BOTTOM_CAM: &str = "/dev/video1";
-const ZED_NAMESPACE: &str = "/zed/zed_node";
+const ZED_NAMESPACE: &str = "/zed/";
 const ZED_DEPTH_TOPIC: &str = "depth/depth_registered";
 const ZED_CLOUD_TOPIC: &str = "point_cloud/cloud_registered";
+const ZED_POSE_TOPIC: &str = "pose";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -81,6 +82,7 @@ pub struct ZedRos2Config {
     pub namespace: String,
     pub depth_topic: String,
     pub cloud_topic: String,
+    pub pose_topic: String,
 }
 
 impl Default for ZedRos2Config {
@@ -89,6 +91,7 @@ impl Default for ZedRos2Config {
             namespace: ZED_NAMESPACE.to_string(),
             depth_topic: ZED_DEPTH_TOPIC.to_string(),
             cloud_topic: ZED_CLOUD_TOPIC.to_string(),
+            pose_topic: ZED_POSE_TOPIC.to_string(),
         }
     }
 }
