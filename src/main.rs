@@ -8,6 +8,7 @@ use sw8s_rust_lib::{
     comms::{
         control_board::{ControlBoard, SensorStatuses},
         meb::MainElectronicsBoard,
+        zed_ros2::ZedRos2,
     },
     config::{Config, SHUTDOWN_TIMEOUT},
     logln,
@@ -130,7 +131,18 @@ async fn static_context() -> &'static FullActionContext<'static, WriteHalf<Seria
                 meb().await,
                 front_cam().await,
                 bottom_cam().await,
+                zed_ros2().await,
             )
+        })
+        .await
+}
+
+static ZED_CELL: OnceCell<ZedRos2> = OnceCell::const_new();
+async fn zed_ros2() -> &'static ZedRos2 {
+    ZED_CELL
+        .get_or_init(|| async {
+            let config = config().await;
+            ZedRos2::new(&config.zed_ros2).unwrap()
         })
         .await
 }
@@ -353,6 +365,7 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
             meb().await,
             front_cam().await,
             bottom_cam().await,
+            zed_ros2().await,
         ))
         .execute()),
         "gate_run_coinflip" => ctwrap!(gate_run_cv_procedural(
@@ -361,6 +374,7 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
                 meb().await,
                 front_cam().await,
                 bottom_cam().await,
+                zed_ros2().await,
             ),
             &config.missions.gate,
             &config.get_color_profile().unwrap(),
@@ -371,6 +385,7 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
                 meb().await,
                 front_cam().await,
                 bottom_cam().await,
+                zed_ros2().await,
             ),
             &config.missions.gate
         )),
@@ -380,6 +395,7 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
                 meb().await,
                 front_cam().await,
                 bottom_cam().await,
+                zed_ros2().await,
             ),
             &config.missions.gate,
         )),
@@ -397,6 +413,7 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
                 meb().await,
                 front_cam().await,
                 bottom_cam().await,
+                zed_ros2().await,
             ),
             &config.missions.path_align,
             &config.get_color_profile().unwrap(),
@@ -407,6 +424,7 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
                 meb().await,
                 front_cam().await,
                 bottom_cam().await,
+                zed_ros2().await,
             ),
             &config.missions.path_align,
         )),
@@ -415,6 +433,7 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
             meb().await,
             front_cam().await,
             bottom_cam().await,
+            zed_ros2().await,
         ))
         .execute()),
         "pid_test" => ctwrap!(pid_test(&FullActionContext::new(
@@ -422,6 +441,7 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
             meb().await,
             front_cam().await,
             bottom_cam().await,
+            zed_ros2().await,
         ))
         .execute()),
         "octagon" => ctwrap!(octagon(

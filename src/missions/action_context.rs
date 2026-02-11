@@ -5,7 +5,7 @@ use opencv::mod_prelude::ToInputArray;
 use tokio::io::{AsyncWriteExt, WriteHalf};
 use tokio_serial::SerialStream;
 
-use crate::comms::{control_board::ControlBoard, meb::MainElectronicsBoard};
+use crate::comms::{control_board::ControlBoard, meb::MainElectronicsBoard, zed_ros2::ZedRos2};
 use crate::video_source::appsink::Camera;
 use crate::video_source::MatSource;
 /**
@@ -20,6 +20,13 @@ pub trait GetControlBoard<T: AsyncWriteExt + Unpin>: Send + Sync {
  */
 pub trait GetMainElectronicsBoard: Send + Sync {
     fn get_main_electronics_board(&self) -> &MainElectronicsBoard<WriteHalf<SerialStream>>;
+}
+
+/**
+ * Inherit this trait if you have a ZED ROS2 client
+ */
+pub trait GetZedRos2: Send + Sync {
+    fn get_zed_ros2(&self) -> &ZedRos2;
 }
 
 /**
@@ -54,6 +61,7 @@ pub struct FullActionContext<'a, T: AsyncWriteExt + Unpin + Send> {
     main_electronics_board: &'a MainElectronicsBoard<WriteHalf<SerialStream>>,
     front_cam: &'a Camera,
     bottom_cam: &'a Camera,
+    zed_ros2: &'a ZedRos2,
 }
 
 impl<'a, T: AsyncWriteExt + Unpin + Send> FullActionContext<'a, T> {
@@ -62,12 +70,14 @@ impl<'a, T: AsyncWriteExt + Unpin + Send> FullActionContext<'a, T> {
         main_electronics_board: &'a MainElectronicsBoard<WriteHalf<SerialStream>>,
         front_cam: &'a Camera,
         bottom_cam: &'a Camera,
+        zed_ros2: &'a ZedRos2,
     ) -> Self {
         Self {
             control_board,
             main_electronics_board,
             front_cam,
             bottom_cam,
+            zed_ros2,
         }
     }
 }
@@ -81,6 +91,12 @@ impl GetControlBoard<WriteHalf<SerialStream>> for FullActionContext<'_, WriteHal
 impl GetMainElectronicsBoard for FullActionContext<'_, WriteHalf<SerialStream>> {
     fn get_main_electronics_board(&self) -> &MainElectronicsBoard<WriteHalf<SerialStream>> {
         self.main_electronics_board
+    }
+}
+
+impl GetZedRos2 for FullActionContext<'_, WriteHalf<SerialStream>> {
+    fn get_zed_ros2(&self) -> &ZedRos2 {
+        self.zed_ros2
     }
 }
 
