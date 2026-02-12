@@ -270,7 +270,7 @@ macro_rules! load_onnx {
         use opencv::core::Vector;
 
         OnnxModel::from_bytes(
-            &Vector::from_slice(include_bytes!($model_name)),
+            &Vector::from_slice(include_bytes!("models/dummy_model.onnx")),
             $model_size,
             $num_objects,
         )

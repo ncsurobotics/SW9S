@@ -1,7 +1,7 @@
 use tokio::io::WriteHalf;
 use tokio_serial::SerialStream;
 
-use crate::act_nest;
+use crate::{act_nest, missions::action_context::GetZedRos2};
 
 use super::{
     action::{
@@ -129,4 +129,22 @@ pub fn race_many<
         ),
         AlwaysTrue::new(),
     )
+}
+
+pub async fn zed_test<
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + GetZedRos2,
+>(
+    context: &Con,
+) {
+    let zed = context.get_zed_ros2();
+
+    loop {
+        if let Some(pose) = zed.latest_pose().await {
+            #[cfg(feature = "logging")]
+            logln!("Pose data received: x {} y {} z {}", pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+        } else {
+            #[cfg(feature = "logging")]
+            logln!("No pose data received");
+        }
+    }
 }
