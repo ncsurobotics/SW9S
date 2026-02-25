@@ -7,6 +7,11 @@ color_profile = "Night Testing"
 shark = "Left"
 saw_fish = "Right"
 
+[zed_ros2]
+namespace = "/zed/zed_node"
+depth_topic = "depth/depth_registered"
+cloud_topic = "point_cloud/cloud_registered"
+
 [missions.gate]
 depth = -1.0
 speed = 1.0
@@ -95,5 +100,4 @@ end = { y = 139, u = 255, v = 255 }
 [color_profiles."B2 Day".yellow]
 start = { y = 0, u = 0, v = 111 }
 end = { y = 144, u = 114, v = 255 }
-
 
