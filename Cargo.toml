@@ -15,12 +15,14 @@ name = "sw9s"
 path = "src/main.rs"
 
 [features]
-default = ["comms", "config", "missions", "video_source", "vision", "logging" ]
+default = ["comms", "config", "missions", "video_source", "vision", "logging", "ros", "meb"]
 comms = []
 config = []
 missions = []
 video_source = ["dep:opencv"]
 vision = ["dep:opencv"]
+meb = []
+ros = []
 logging = []
 annotated_streams = ["logging"]
 
