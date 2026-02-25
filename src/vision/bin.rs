@@ -70,7 +70,7 @@ impl Bin<OnnxModel> {
     }
 
     pub fn load_640(threshold: f64) -> Self {
-        let model = load_onnx!("models/bin_640.onnx", 640, 3);
+        let model = load_onnx!("models/dummy_model.onnx", 640, 3);
 
         Self { model, threshold }
     }

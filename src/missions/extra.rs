@@ -2,14 +2,10 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use anyhow::{anyhow, bail};
-use uuid::Uuid;
 
 use crate::logln;
 
-use super::{
-    action::{Action, ActionExec, ActionMod},
-    graph::{stripped_fn, stripped_type, DotString},
-};
+use super::action::{Action, ActionExec, ActionMod};
 
 /// Development Action that does... nothing
 ///
@@ -55,15 +51,7 @@ impl Terminal {
     }
 }
 
-impl Action for Terminal {
-    fn dot_string(&self, _parent: &str) -> DotString {
-        DotString {
-            head_ids: vec![],
-            tail_ids: vec![],
-            body: "".to_string(),
-        }
-    }
-}
+impl Action for Terminal {}
 
 impl<T: Send + Sync> ActionMod<T> for Terminal {
     fn modify(&mut self, _input: &T) {}
@@ -93,15 +81,7 @@ impl<T> OutputType<T> {
     }
 }
 
-impl<T> Action for OutputType<T> {
-    fn dot_string(&self, _parent: &str) -> DotString {
-        DotString {
-            head_ids: vec![],
-            tail_ids: vec![],
-            body: "".to_string(),
-        }
-    }
-}
+impl<T> Action for OutputType<T> {}
 
 impl<T: Send + Sync> ActionMod<T> for OutputType<T> {
     fn modify(&mut self, _input: &T) {}
@@ -235,19 +215,7 @@ impl CountTrue {
     }
 }
 
-impl Action for CountTrue {
-    fn dot_string(&self, _parent: &str) -> DotString {
-        let id = Uuid::new_v4();
-        DotString {
-            head_ids: vec![id],
-            tail_ids: vec![id],
-            body: format!(
-                "\"{}\" [label = \"Consecutive True < {}\", margin = 0];\n",
-                id, self.target
-            ),
-        }
-    }
-}
+impl Action for CountTrue {}
 
 impl<T: Send + Sync> ActionMod<anyhow::Result<T>> for CountTrue {
     fn modify(&mut self, input: &anyhow::Result<T>) {
@@ -314,19 +282,7 @@ impl CountFalse {
     }
 }
 
-impl Action for CountFalse {
-    fn dot_string(&self, _parent: &str) -> DotString {
-        let id = Uuid::new_v4();
-        DotString {
-            head_ids: vec![id],
-            tail_ids: vec![id],
-            body: format!(
-                "\"{}\" [label = \"Consecutive False < {}\", margin = 0];\n",
-                id, self.target
-            ),
-        }
-    }
-}
+impl Action for CountFalse {}
 
 impl<T: Send + Sync> ActionMod<anyhow::Result<T>> for CountFalse {
     fn modify(&mut self, input: &anyhow::Result<T>) {
@@ -398,44 +354,7 @@ impl<T, U> InOrderFail<T, U> {
     }
 }
 
-impl<T: Action, U: Action> Action for InOrderFail<T, U> {
-    fn dot_string(&self, _parent: &str) -> DotString {
-        let first_str = self.first.dot_string(stripped_type::<Self>());
-        let second_str = self.second.dot_string(stripped_type::<Self>());
-        let (order_head, order_tail) = (Uuid::new_v4(), Uuid::new_v4());
-
-        let mut body_str = format!(
-                "subgraph \"cluster_{}\" {{\nstyle = dashed;\ncolor = black;\n\"{}\" [label = \"{}\", shape = box, style = dashed];\n",
-                Uuid::new_v4(),
-                order_head,
-                "In Order",
-            );
-
-        body_str.push_str(&(format!("\"{order_tail}\" [label = \"All Resolved\", shape = diamond, fontcolor = black, style = dashed];\n")));
-
-        body_str.push_str(&(first_str.body + &second_str.body));
-        first_str
-            .head_ids
-            .iter()
-            .for_each(|id| body_str.push_str(&format!("\"{order_head}\" -> \"{id}\";\n")));
-        first_str.tail_ids.iter().for_each(|tail_id| {
-            second_str.head_ids.iter().for_each(|head_id| {
-                body_str.push_str(&format!("\"{tail_id}\" -> \"{head_id}\";\n"))
-            })
-        });
-        second_str.tail_ids.iter().for_each(|tail_id| {
-            body_str.push_str(&format!("\"{tail_id}\" -> \"{order_tail}\";\n"))
-        });
-
-        body_str.push_str("}\n");
-
-        DotString {
-            head_ids: vec![order_head],
-            tail_ids: vec![order_tail],
-            body: body_str,
-        }
-    }
-}
+impl<T: Action, U: Action> Action for InOrderFail<T, U> {}
 
 impl<T: ActionMod<V>, U: ActionMod<V>, V: Send + Sync> ActionMod<V> for InOrderFail<T, U> {
     fn modify(&mut self, input: &V) {
@@ -470,20 +389,7 @@ pub struct Transform<T, U, V: Fn(T) -> U> {
     transform_function: V,
 }
 
-impl<T, U, V: Fn(T) -> U> Action for Transform<T, U, V> {
-    fn dot_string(&self, _parent: &str) -> DotString {
-        let id = Uuid::new_v4();
-        DotString {
-            head_ids: vec![id],
-            tail_ids: vec![id],
-            body: format!(
-                "\"{}\" [label = \"{}\", margin = 0];\n",
-                id,
-                stripped_fn::<V>()
-            ),
-        }
-    }
-}
+impl<T, U, V: Fn(T) -> U> Action for Transform<T, U, V> {}
 
 impl<T, U, V: Fn(T) -> U> Transform<T, U, V> {
     pub const fn new(value: T, transform_function: V) -> Self {

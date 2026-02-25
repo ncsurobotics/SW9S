@@ -232,7 +232,6 @@ mod tests {
         core::Vector,
         imgcodecs::{imread, imwrite, IMREAD_COLOR},
     };
-    use rayon::iter::{ParallelBridge, ParallelIterator};
 
     use crate::{
         logln,

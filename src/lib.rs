@@ -34,8 +34,13 @@ macro_rules! logln {
 /// `1.0` is counterclockwise to find buoy, clockwise to find octagon.
 pub const POOL_YAW_SIGN: f32 = -1.0;
 
+#[cfg(feature = "comms")]
 pub mod comms;
+#[cfg(feature = "config")]
 pub mod config;
+#[cfg(feature = "missions")]
 pub mod missions;
+#[cfg(feature = "video_source")]
 pub mod video_source;
+#[cfg(feature = "vision")]
 pub mod vision;

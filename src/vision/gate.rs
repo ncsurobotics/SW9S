@@ -65,14 +65,14 @@ impl Gate<OnnxModel> {
 
     pub fn load_320(threshold: f64) -> Self {
         Self {
-            model: load_onnx!("models/gate_320.onnx", 320, 4),
+            model: load_onnx!("models/dummy_model.onnx", 320, 4),
             threshold,
         }
     }
 
     pub fn load_640(threshold: f64) -> Self {
         Self {
-            model: load_onnx!("models/gate_640.onnx", 640, 4),
+            model: load_onnx!("models/dummy_model.onnx", 640, 4),
             threshold,
         }
     }
