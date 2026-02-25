@@ -6,7 +6,6 @@ use std::{iter::Sum, marker::PhantomData};
 
 use super::action::{Action, ActionExec, ActionMod};
 use super::action_context::BottomCamIO;
-use super::graph::DotString;
 use crate::logln;
 use crate::vision::{
     Angle2D, Draw, DrawRect2d, Offset2D, RelPos, RelPosAngle, VisualDetection, VisualDetector,
@@ -756,19 +755,7 @@ impl<T, U, V> DetectTarget<T, U, V> {
     }
 }
 
-impl<T: Display, U, V> Action for DetectTarget<T, U, V> {
-    fn dot_string(&self, _parent: &str) -> DotString {
-        let id = Uuid::new_v4();
-        DotString {
-            head_ids: vec![id],
-            tail_ids: vec![id],
-            body: format!(
-                "\"{}\" [label = \"Detect {}\", margin = 0];\n",
-                id, self.target
-            ),
-        }
-    }
-}
+impl<T: Display, U, V> Action for DetectTarget<T, U, V> {}
 
 impl<
         T: Send + Sync + PartialEq + Display,

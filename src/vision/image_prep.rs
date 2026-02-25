@@ -25,7 +25,7 @@ use anyhow::Result;
 ///     core::{Mat, Size},
 ///     prelude::{MatTraitConst, MatTraitConstManual, MatSizeTraitConst},
 /// };
-/// use sw8s_rust_lib::vision::image_prep::resize;
+/// use sw9s_lib::vision::image_prep::resize;
 ///
 /// let raw_mat: [u8; 7] = [0, 5, 32, 32, 5, 0, 1];
 /// let mat = Mat::from_slice(&raw_mat).unwrap().clone_pointee();
@@ -54,7 +54,7 @@ pub fn resize(frame: &Mat, target_size: &Size) -> Result<Mat> {
 /// # Examples
 /// ```
 /// use opencv::core::{Mat, Size};
-/// use sw8s_rust_lib::vision::image_prep::check_bounds;
+/// use sw9s_lib::vision::image_prep::check_bounds;
 ///
 /// let raw_mat: [u8; 7] = [0, 0, 0, 255, 255, 0, 0];
 /// let mat = Mat::from_slice(&raw_mat).unwrap().clone_pointee();
@@ -86,7 +86,7 @@ pub fn check_bounds(image: &Mat, bounds: &Size) -> bool {
 ///     core::{Mat, Size},
 ///     prelude::{MatTraitConst, MatTraitConstManual, MatSizeTraitConst},
 /// };
-/// use sw8s_rust_lib::vision::image_prep::slice_number;
+/// use sw9s_lib::vision::image_prep::slice_number;
 ///
 /// let raw_mat: [u8; 8] = [0, 5, 32, 32, 5, 0, 1, 3];
 /// let mat = Mat::from_slice(&raw_mat).unwrap().clone_pointee();
@@ -175,7 +175,7 @@ pub fn binary_pca(points: &[Point_<f64>], max_components: i32) -> Result<PcaData
 /// ```
 /// use opencv::core::{Mat, Mat_, Point, VecN};
 /// use opencv::prelude::MatTraitConstManual;
-/// use sw8s_rust_lib::vision::image_prep::cvt_binary_to_points;
+/// use sw9s_lib::vision::image_prep::cvt_binary_to_points;
 ///
 /// let raw_mat: [u8; 7] = [0, 0, 0, 255, 255, 0, 0];
 /// let mat: Mat_<u8> = Mat::from_slice(&raw_mat).unwrap().clone_pointee().try_into_typed().unwrap();
@@ -220,7 +220,7 @@ pub fn cvt_binary_to_points(binary_image: &Mat_<u8>) -> Vec<Point_<f64>> {
 /// ```
 /// use opencv::core::{Mat, Mat_};
 /// use opencv::prelude::MatTraitConstManual;
-/// use sw8s_rust_lib::vision::image_prep::unique_colors;
+/// use sw9s_lib::vision::image_prep::unique_colors;
 ///
 /// let raw_mat: [u8; 7] = [0, 5, 32, 32, 5, 0, 1];
 /// let mat: Mat_<u8> = Mat::from_slice(&raw_mat).unwrap().clone_pointee().try_into_typed().unwrap();
@@ -270,7 +270,7 @@ impl<T: Hash, const N: usize> VecNHash<T, N> {
 /// ```
 /// use opencv::core::{Mat, Mat_, VecN};
 /// use opencv::prelude::MatTraitConstManual;
-/// use sw8s_rust_lib::vision::image_prep::unique_colors_vec;
+/// use sw9s_lib::vision::image_prep::unique_colors_vec;
 ///
 /// let raw_mat: [VecN<u8, 2>; 1] = [VecN::from_array([0, 0])];
 /// let mat: Mat_<VecN<u8, 2>> = Mat::from_slice(&raw_mat).unwrap().clone_pointee().try_into_typed().unwrap();
