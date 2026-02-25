@@ -1,7 +1,12 @@
 use anyhow::Result;
 use futures::StreamExt;
-use ros2_client::{Context, MessageTypeName, Name, NodeName, NodeOptions, DEFAULT_SUBSCRIPTION_QOS};
-use ros2_interfaces_jazzy_serde::{sensor_msgs::msg::{Image, PointCloud2}, geometry_msgs::msg::PoseStamped};
+use ros2_client::{
+    Context, MessageTypeName, Name, NodeName, NodeOptions, DEFAULT_SUBSCRIPTION_QOS,
+};
+use ros2_interfaces_jazzy_serde::{
+    geometry_msgs::msg::PoseStamped,
+    sensor_msgs::msg::{Image, PointCloud2},
+};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -20,7 +25,7 @@ impl ZedRos2 {
     pub fn new(config: &ZedRos2Config) -> Result<Self> {
         let context = Context::new()?;
         let mut node = context.new_node(
-            NodeName::new(config.namespace.as_str(), "sw8s_zed_client")?,
+            NodeName::new(config.namespace.as_str(), "sw9s_zed_client")?,
             NodeOptions::new(),
         )?;
 
