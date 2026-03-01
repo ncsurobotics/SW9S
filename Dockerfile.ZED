@@ -8,21 +8,30 @@ RUN locale-gen en_US.UTF-8
 RUN update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8
 ENV LANG=en_US.UTF-8
 
+# Fix tzdata
+RUN ln -fs /usr/share/zoneinfo/UTC /etc/localtime \
+    && export DEBIAN_FRONTEND=noninteractive \
+    && apt-get update && apt-get install -y tzdata \
+    && dpkg-reconfigure --frontend noninteractive tzdata
+
 # Install
 RUN apt update && apt install -y \
     build-essential \
     cmake \
     git \
     python3-pip \
-    python3-rosdep \
-    python3-rosinstall-generator \
-    python3-vcstool \
     unzip \
     wget
 RUN apt update
 RUN git clone https://github.com/Tiryoh/ros2_setup_scripts_ubuntu.git
-WORKDIR ~/ros2_setup_scripts_ubuntu
-RUN chmod +x run.sh
-RUN ./run.sh
+RUN ./ros2_setup_scripts_ubuntu/run.sh
 
-RUN source /opt/ros/jazzy/setup.bash
+RUN mkdir -p /root/ros2_ws/src
+WORKDIR /root/ros2_ws/src
+RUN git clone https://github.com/stereolabs/zed-ros2-wrapper.git
+WORKDIR /root/ros2_ws
+RUN apt update && rosdep update
+RUN rosdep install --from-paths src --ignore-src -r -y
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install"
+
+CMD ["bash", "-c", "source /root/ros2_ws/install/setup.bash"]
