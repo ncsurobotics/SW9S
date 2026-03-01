@@ -39,6 +39,6 @@ RUN apt install -y python3-rosdep
 RUN rosdep init || true
 RUN rosdep update --rosdistro=humble
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && rosdep install --from-paths src --ignore-src --rosdistro humble -r -y"
-RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install --cmake-args=-DCMAKE_BUILD_TYPE=Release --parallel-workers $(nproc)"
+RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install --packages-up-to zed_wrapper --cmake-args=-DCMAKE_BUILD_TYPE=Release --parallel-workers $(nproc)"
 
 CMD ["bash", "-c", "source /root/ros2_ws/install/setup.bash"]
