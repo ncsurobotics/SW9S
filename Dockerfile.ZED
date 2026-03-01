@@ -34,6 +34,7 @@ RUN git clone https://github.com/stereolabs/zed-ros2-wrapper.git
 WORKDIR /root/ros2_ws
 RUN apt update && rosdep update
 RUN rosdep install --from-paths src --ignore-src -r -y
+RUN apt update && apt install -y ros-humble-zed_msgs
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install --packages-ignore zed_debug --cmake-args=-DCMAKE_BUILD_TYPE=Release --parallel-workers $(nproc)"
 
 CMD ["bash", "-c", "source /root/ros2_ws/install/setup.bash"]
