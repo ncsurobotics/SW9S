@@ -22,11 +22,12 @@ RUN apt update && apt install -y \
     python3-pip \
     unzip \
     wget
-RUN apt update
 WORKDIR /root
 RUN git clone https://github.com/Tiryoh/ros2_setup_scripts_ubuntu.git
+RUN apt update
 RUN ./ros2_setup_scripts_ubuntu/run.sh
 
+RUN apt update
 RUN mkdir -p /root/ros2_ws/src
 WORKDIR /root/ros2_ws/src
 RUN git clone https://github.com/stereolabs/zed-ros2-wrapper.git
