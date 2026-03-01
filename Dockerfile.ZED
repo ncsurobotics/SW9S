@@ -26,6 +26,7 @@ WORKDIR /root
 RUN git clone https://github.com/Tiryoh/ros2_setup_scripts_ubuntu.git
 RUN apt update
 RUN ./ros2_setup_scripts_ubuntu/ros2-humble-desktop-main.sh
+RUN apt update && apt install -y ros-humble-nmea-msgs
 
 RUN apt update
 RUN mkdir -p /root/ros2_ws/src
@@ -33,7 +34,8 @@ WORKDIR /root/ros2_ws/src
 RUN git clone https://github.com/stereolabs/zed-ros2-wrapper.git
 RUN git clone https://github.com/stereolabs/zed-ros2-interfaces.git
 WORKDIR /root/ros2_ws
-RUN apt update && rosdep update
+RUN apt update
+RUN rosdep update
 RUN rosdep install --from-paths src --ignore-src -r -y
 RUN /bin/bash -c "source /opt/ros/humble/setup.bash && colcon build --symlink-install --packages-skip zed_debug --cmake-args=-DCMAKE_BUILD_TYPE=Release --parallel-workers $(nproc)"
 
