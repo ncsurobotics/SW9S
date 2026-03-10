@@ -46,14 +46,16 @@ impl<T: AsyncWriteExt + Unpin> Deref for ControlBoard<T> {
 }
 
 impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
-    pub async fn new<U>(comm_out: T, comm_in: U, msg_id: Option<MessageId>) -> Result<Self>
+    pub async fn new<U>(
+        comm_out: T,
+        comm_in: U,
+        msg_id: Option<MessageId>,
+        thruster_inversions: Vec<bool>,
+        dof_speeds: &[f32; 6],
+    ) -> Result<Self>
     where
         U: 'static + AsyncRead + Unpin + Send,
     {
-        const THRUSTER_INVS: [bool; 8] = [true, true, false, false, true, false, false, true];
-        #[allow(clippy::approx_constant)]
-        const DOF_SPEEDS: [f32; 6] = [0.7071, 0.7071, 1.0, 0.4413, 1.0, 0.8139];
-
         let msg_id = msg_id.unwrap_or_default();
         let responses = ResponseMap::new(comm_in).await;
         let this = Self {
@@ -62,8 +64,8 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         };
 
         this.init_matrices().await?;
-        this.thruster_inversion_set(&THRUSTER_INVS).await?;
-        this.relative_dof_speed_set_batch(&DOF_SPEEDS).await?;
+        this.thruster_inversion_set(thruster_inversions).await?;
+        this.relative_dof_speed_set_batch(dof_speeds).await?;
         this.bno055_imu_axis_config(BNO055AxisConfig::P6).await?;
 
         loop {
@@ -101,6 +103,26 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
             sleep(Duration::from_millis(10)).await;
         }
         Ok(this)
+    }
+    pub async fn new_with_defaults<U>(
+        comm_out: T,
+        comm_in: U,
+        msg_id: Option<MessageId>,
+    ) -> Result<Self>
+    where
+        U: 'static + AsyncRead + Unpin + Send,
+    {
+        const THRUSTER_INVS: [bool; 8] = [true, true, false, false, true, false, false, true];
+        #[allow(clippy::approx_constant)]
+        const DOF_SPEEDS: [f32; 6] = [0.7071, 0.7071, 1.0, 0.4413, 1.0, 0.8139];
+        Self::new(
+            comm_out,
+            comm_in,
+            msg_id,
+            Vec::from(THRUSTER_INVS),
+            &DOF_SPEEDS,
+        )
+        .await
     }
 
     async fn init_matrices(&self) -> Result<()> {
@@ -219,7 +241,7 @@ impl<T: AsyncWrite + Unpin> ControlBoard<T> {
     ///
     /// # Arguments:
     /// * `inversions` - Array of invert statuses, with motor 1 at index 0
-    pub async fn thruster_inversion_set(&self, inversions: &[bool; 8]) -> Result<()> {
+    pub async fn thruster_inversion_set(&self, inversions: Vec<bool>) -> Result<()> {
         const THRUSTER_INVERSION_SET: [u8; 4] = *b"TINV";
         let mut message = Vec::from(THRUSTER_INVERSION_SET);
 
