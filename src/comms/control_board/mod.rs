@@ -17,6 +17,7 @@ use self::{
 
 use super::auv_control_board::{AUVControlBoard, MessageId};
 use crate::logln;
+use std::marker::PhantomData;
 
 pub mod response;
 pub mod util;
@@ -45,6 +46,66 @@ impl<T: AsyncWriteExt + Unpin> Deref for ControlBoard<T> {
     }
 }
 
+/// Contains a *populated* DoF matrix. Intended for us in [`init_matrices`].
+/// Can onlly be created using DoFMatrixBuilder.
+pub struct DoFMatrix([MotorMatrixRowParams; 8]);
+
+// Making a builder where all rows of the matrix must be constructed for it to be
+// able to be built
+// forgot if this was the exact name, feel free to change it
+/// Builder for creating the parameters for [`init_matrices`]
+/// There will be 8 rows, each with 6 elements
+#[derive(Debug)]
+pub struct DoFMatrixBuilder(pub [Option<MotorMatrixRowParams>; 8]);
+
+impl DoFMatrixBuilder {
+    pub fn new() -> Self {
+        DoFMatrixBuilder([None, None, None, None, None, None, None, None])
+    }
+
+    // TODO: make thrust amount modifible. It is also probably a good idea to use
+    // a hashmap as thruster indexes do not start as 0, and this struct needs
+    // to be modified to have different thruster amounts.
+    pub fn set_row(mut self, thruster: u8, parameters: MotorMatrixRowParams) -> Self {
+        let thruster_index = thruster - 1;
+        self.0[thruster_index as usize] = Some(parameters);
+        self
+    }
+
+    pub fn build(self) -> DoFMatrix {
+        // Later we will pass up an error, but for now we just panic as I don't
+        // know the error ecosystem works yet
+
+        // Make sure that all of the arrays contain `Some()`
+        DoFMatrix(self.0.map(|x| x.unwrap()))
+    }
+}
+
+/// Each row corresponds to a line of self.motor_matrix_set(...);
+/// Can either be created manually, or the parameters can be dumped into [`Self::new`]
+/// for shorter code.
+pub struct MotorMatrixRowParams {
+    x: f32,
+    y: f32,
+    z: f32,
+    pitch: f32,
+    roll: f32,
+    yaw: f32,
+}
+
+impl MotorMatrixRowParams {
+    pub fn new(x: f32, y: f32, z: f32, pitch: f32, roll: f32, yaw: f32) -> Self {
+        Self {
+            x,
+            y,
+            z,
+            pitch,
+            roll,
+            yaw,
+        }
+    }
+}
+
 impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
     pub async fn new<U>(
         comm_out: T,
@@ -63,7 +124,21 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
             initial_angles: Arc::default(),
         };
 
-        this.init_matrices().await?;
+        let dof_matrix = DoFMatrixBuilder::new()
+            .set_row(1, MotorMatrixRowParams::new(-1.0, 1.0, 0.0, 0.0, 0.0, -1.0))
+            .set_row(2, MotorMatrixRowParams::new(1.0, 1.0, 0.0, 0.0, 0.0, 1.0))
+            .set_row(3, MotorMatrixRowParams::new(-1.0, -1.0, 0.0, 0.0, 0.0, 1.0))
+            .set_row(4, MotorMatrixRowParams::new(1.0, -1.0, 0.0, 0.0, 0.0, -1.0))
+            .set_row(5, MotorMatrixRowParams::new(0.0, 0.0, -1.0, 1.0, -1.0, 0.0))
+            .set_row(6, MotorMatrixRowParams::new(0.0, 0.0, -1.0, 1.0, 1.0, 0.0))
+            .set_row(
+                7,
+                MotorMatrixRowParams::new(0.0, 0.0, -1.0, -1.0, -1.0, 0.0),
+            )
+            .set_row(8, MotorMatrixRowParams::new(0.0, 0.0, -1.0, -1.0, 1.0, 0.0))
+            .build();
+
+        this.init_matrices(dof_matrix).await?;
         this.thruster_inversion_set(thruster_inversions).await?;
         this.relative_dof_speed_set_batch(dof_speeds).await?;
         this.bno055_imu_axis_config(BNO055AxisConfig::P6).await?;
@@ -125,25 +200,32 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         .await
     }
 
-    async fn init_matrices(&self) -> Result<()> {
-        self.motor_matrix_set(3, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0)
-            .await?;
-        self.motor_matrix_set(4, 1.0, -1.0, 0.0, 0.0, 0.0, -1.0)
-            .await?;
-        self.motor_matrix_set(1, -1.0, 1.0, 0.0, 0.0, 0.0, -1.0)
-            .await?;
-        self.motor_matrix_set(2, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-            .await?;
-        self.motor_matrix_set(7, 0.0, 0.0, -1.0, -1.0, -1.0, 0.0)
-            .await?;
-        self.motor_matrix_set(8, 0.0, 0.0, -1.0, -1.0, 1.0, 0.0)
-            .await?;
-        self.motor_matrix_set(5, 0.0, 0.0, -1.0, 1.0, -1.0, 0.0)
-            .await?;
-        self.motor_matrix_set(6, 0.0, 0.0, -1.0, 1.0, 1.0, 0.0)
-            .await?;
+    async fn init_matrices(&self, dof_matrix: DoFMatrix) -> Result<()> {
+        for (i, row) in dof_matrix.0.iter().enumerate() {
+            self.motor_matrix_set(i as u8, row.x, row.y, row.z, row.pitch, row.roll, row.yaw)
+                .await?;
+        }
 
-        self.motor_matrix_update().await
+        self.motor_matrix_update().await;
+
+        // self.motor_matrix_set(3, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0)
+        //     .await?;
+        // self.motor_matrix_set(4, 1.0, -1.0, 0.0, 0.0, 0.0, -1.0)
+        //     .await?;
+        // self.motor_matrix_set(1, -1.0, 1.0, 0.0, 0.0, 0.0, -1.0)
+        //     .await?;
+        // self.motor_matrix_set(2, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0)
+        //     .await?;
+        // self.motor_matrix_set(7, 0.0, 0.0, -1.0, -1.0, -1.0, 0.0)
+        //     .await?;
+        // self.motor_matrix_set(8, 0.0, 0.0, -1.0, -1.0, 1.0, 0.0)
+        //     .await?;
+        // self.motor_matrix_set(5, 0.0, 0.0, -1.0, 1.0, -1.0, 0.0)
+        //     .await?;
+        // self.motor_matrix_set(6, 0.0, 0.0, -1.0, 1.0, 1.0, 0.0)
+        //     .await?;
+
+        // self.motor_matrix_update().await
     }
 
     async fn stab_tune(&self) -> Result<()> {
