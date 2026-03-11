@@ -48,6 +48,7 @@ impl<T: AsyncWriteExt + Unpin> Deref for ControlBoard<T> {
 
 /// Contains a *populated* DoF matrix. Intended for us in [`init_matrices`].
 /// Can onlly be created using DoFMatrixBuilder.
+#[derive(Debug)]
 pub struct DoFMatrix(pub(crate) [Option<MotorMatrixRowParams>; 8]);
 
 /// A builder for DoFMatrix. This struct makes it cleaner to define thruster parameters,
@@ -61,30 +62,34 @@ pub struct DoFMatrixBuilder {
 impl DoFMatrixBuilder {
     /// Creates an unpopulated builder.
     pub fn new(thrusters_in_use: u8) -> Self {
-        DoFMatrixBuilder([None, None, None, None, None, None, None, None])
+        DoFMatrixBuilder {
+            params: [None, None, None, None, None, None, None, None],
+            thrusters_in_use,
+        }
     }
 
     /// Sets the parameters for a specific thruster.
     pub fn set_row(mut self, thruster: u8, parameters: MotorMatrixRowParams) -> Self {
         let thruster_index = thruster - 1;
-        self.0[thruster_index as usize] = Some(parameters);
+        self.params[thruster_index as usize] = Some(parameters);
         self
     }
 
     pub fn build(self) -> DoFMatrix {
         // Make sure that we currently have parameters for `thrusters_in_use` thrusters.
-        let thrusters_defined = self.params.iter().filter(|x| x.is_some()).iter().count();
+        let thrusters_defined = self.params.iter().filter(|x| x.is_some()).count();
 
-        assert!(thrusters_defined, self.thrusters_in_use);
+        assert_eq!(thrusters_defined, self.thrusters_in_use as usize);
 
         // Make sure that all of the arrays contain `Some()`
-        DoFMatrix(self.0)
+        DoFMatrix(self.params)
     }
 }
 
 /// Each row corresponds to a line of self.motor_matrix_set(...);
 /// Can either be created manually, or the parameters can be dumped into [`Self::new`]
 /// for shorter code.
+#[derive(Debug)]
 pub struct MotorMatrixRowParams {
     x: f32,
     y: f32,
@@ -211,7 +216,7 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
             }
         }
 
-        self.motor_matrix_update().await;
+        self.motor_matrix_update().await
 
         // self.motor_matrix_set(3, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0)
         //     .await?;
