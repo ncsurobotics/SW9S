@@ -203,9 +203,12 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
     }
 
     async fn init_matrices(&self, dof_matrix: DoFMatrix) -> Result<()> {
-        for (i, row) in dof_matrix.0.iter().filter_map(|x| *x).enumerate() {
-            self.motor_matrix_set(i as u8, row.x, row.y, row.z, row.pitch, row.roll, row.yaw)
-                .await?;
+        for (i, _row) in dof_matrix.0.iter().enumerate() {
+            // If the row is defined for the thruster, then set it
+            if let Some(row) = _row {
+                self.motor_matrix_set(i as u8, row.x, row.y, row.z, row.pitch, row.roll, row.yaw)
+                    .await?;
+            }
         }
 
         self.motor_matrix_update().await;
