@@ -48,24 +48,23 @@ impl<T: AsyncWriteExt + Unpin> Deref for ControlBoard<T> {
 
 /// Contains a *populated* DoF matrix. Intended for us in [`init_matrices`].
 /// Can onlly be created using DoFMatrixBuilder.
-pub struct DoFMatrix([MotorMatrixRowParams; 8]);
+pub struct DoFMatrix(pub(crate) [Option<MotorMatrixRowParams>; 8]);
 
-// Making a builder where all rows of the matrix must be constructed for it to be
-// able to be built
-// forgot if this was the exact name, feel free to change it
-/// Builder for creating the parameters for [`init_matrices`]
-/// There will be 8 rows, each with 6 elements
+/// A builder for DoFMatrix. This struct makes it cleaner to define thruster parameters,
+/// as well as validate that the correct amount of thrusters have a definition.
 #[derive(Debug)]
-pub struct DoFMatrixBuilder(pub [Option<MotorMatrixRowParams>; 8]);
+pub struct DoFMatrixBuilder {
+    pub(crate) params: [Option<MotorMatrixRowParams>; 8],
+    pub(crate) thrusters_in_use: u8,
+}
 
 impl DoFMatrixBuilder {
-    pub fn new() -> Self {
+    /// Creates an unpopulated builder.
+    pub fn new(thrusters_in_use: u8) -> Self {
         DoFMatrixBuilder([None, None, None, None, None, None, None, None])
     }
 
-    // TODO: make thrust amount modifible. It is also probably a good idea to use
-    // a hashmap as thruster indexes do not start as 0, and this struct needs
-    // to be modified to have different thruster amounts.
+    /// Sets the parameters for a specific thruster.
     pub fn set_row(mut self, thruster: u8, parameters: MotorMatrixRowParams) -> Self {
         let thruster_index = thruster - 1;
         self.0[thruster_index as usize] = Some(parameters);
@@ -73,11 +72,13 @@ impl DoFMatrixBuilder {
     }
 
     pub fn build(self) -> DoFMatrix {
-        // Later we will pass up an error, but for now we just panic as I don't
-        // know the error ecosystem works yet
+        // Make sure that we currently have parameters for `thrusters_in_use` thrusters.
+        let thrusters_defined = self.params.iter().filter(|x| x.is_some()).iter().count();
+
+        assert!(thrusters_defined, self.thrusters_in_use);
 
         // Make sure that all of the arrays contain `Some()`
-        DoFMatrix(self.0.map(|x| x.unwrap()))
+        DoFMatrix(self.0)
     }
 }
 
@@ -124,7 +125,8 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
             initial_angles: Arc::default(),
         };
 
-        let dof_matrix = DoFMatrixBuilder::new()
+        const THRUSTER_COUNT: u8 = 8;
+        let dof_matrix = DoFMatrixBuilder::new(THRUSTER_COUNT)
             .set_row(1, MotorMatrixRowParams::new(-1.0, 1.0, 0.0, 0.0, 0.0, -1.0))
             .set_row(2, MotorMatrixRowParams::new(1.0, 1.0, 0.0, 0.0, 0.0, 1.0))
             .set_row(3, MotorMatrixRowParams::new(-1.0, -1.0, 0.0, 0.0, 0.0, 1.0))
@@ -201,7 +203,7 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
     }
 
     async fn init_matrices(&self, dof_matrix: DoFMatrix) -> Result<()> {
-        for (i, row) in dof_matrix.0.iter().enumerate() {
+        for (i, row) in dof_matrix.0.iter().filter_map(|x| *x).enumerate() {
             self.motor_matrix_set(i as u8, row.x, row.y, row.z, row.pitch, row.roll, row.yaw)
                 .await?;
         }
