@@ -216,6 +216,7 @@ async fn shutdown_handler() -> (UnboundedSender<i32>, CancellationToken) {
                 x
             }
         };
+        println!("Exit Status: {exit_status}");
 
         let status = control_board().await.sensor_status_query().await;
 
@@ -238,7 +239,7 @@ async fn shutdown_handler() -> (UnboundedSender<i32>, CancellationToken) {
         };
 
         // Reset Torpedo
-        ResetTorpedo::new(static_context().await).execute().await;
+        // ResetTorpedo::new(static_context().await).execute().await;
 
         // If shutdown is unexpected, cancel running missions and exit nonzero
         if exit_status != 0 {
@@ -254,6 +255,7 @@ async fn shutdown_handler() -> (UnboundedSender<i32>, CancellationToken) {
             {
                 logln!("Missions did not exit within {SHUTDOWN_TIMEOUT} seconds")
             }
+            println!("EXITING PROCESS");
             exit(exit_status)
         };
     });
@@ -270,6 +272,7 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
     }
 
     let config = config().await;
+    println!("Running {mission}");
     let res = match mission.to_lowercase().as_str() {
         "arm" => ctwrap!(WaitArm::new(static_context().await).execute()),
         "empty" => {
