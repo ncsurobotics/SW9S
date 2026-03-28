@@ -1,0 +1,27 @@
+[target.aarch64-unknown-linux-gnu]
+
+linker = "clang"
+ar     = "llvm-ar"
+
+rustflags = [
+    "-C", "link-arg=-target",
+    "-C", "link-arg=aarch64-linux-gnu",
+    "-C", "link-arg=-mcpu=cortex-a57",
+    "-C", "link-arg=-fuse-ld=lld",
+    # --sysroot and -L paths are injected here.
+    "-C", "link-arg=--sysroot=../sysroot-jetson",
+    "-C", "link-arg=-L../sysroot-jetson/usr/local/cuda-10.2/targets/aarch64-linux/lib/",
+    "-C", "link-arg=-L../sysroot-jetson/usr/lib/aarch64-linux-gnu/",
+]
+
+[env]
+CC_aarch64_unknown_linux_gnu  = "clang"
+CXX_aarch64_unknown_linux_gnu = "clang++"
+AR_aarch64_unknown_linux_gnu  = "llvm-ar"
+
+CFLAGS_aarch64_unknown_linux_gnu = "-target aarch64-linux-gnu -mcpu=cortex-a57 -fuse-ld=lld --sysroot=../sysroot-jetson -L../sysroot-jetson/usr/local/cuda-10.2/targets/aarch64-linux/lib/ -L../sysroot-jetson/usr/lib/aarch64-linux-gnu/"
+CXXFLAGS_aarch64_unknown_linux_gnu = "-target aarch64-linux-gnu -mcpu=cortex-a57 -fuse-ld=lld --sysroot=../sysroot-jetson -L../sysroot-jetson/usr/local/cuda-10.2/targets/aarch64-linux/lib/ -L../sysroot-jetson/usr/lib/aarch64-linux-gnu/"
+LDFLAGS_aarch64_unknown_linux_gnu  = "-target aarch64-linux-gnu -mcpu=cortex-a57 -fuse-ld=lld --sysroot=../sysroot-jetson -L../sysroot-jetson/usr/local/cuda-10.2/targets/aarch64-linux/lib/ -L../sysroot-jetson/usr/lib/aarch64-linux-gnu/"
+
+# Tell opencv-sys not to use pkg-config / cmake / vcpkg.
+OPENCV_DISABLE_PROBES = "pkg_config,cmake,vcpkg_cmake,vcpkg"
