@@ -142,7 +142,12 @@ pub async fn zed_test<
     loop {
         if let Some(pose) = zed.latest_pose().await {
             #[cfg(feature = "logging")]
-            logln!("Pose data received: x {} y {} z {}", pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+            logln!(
+                "Pose data received: x {} y {} z {}",
+                pose.pose.position.x,
+                pose.pose.position.y,
+                pose.pose.position.z
+            );
         } else {
             #[cfg(feature = "logging")]
             logln!("No pose data received");

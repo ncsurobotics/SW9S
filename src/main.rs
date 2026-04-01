@@ -24,7 +24,6 @@ use sw8s_rust_lib::{
         meb::WaitArm,
         octagon::octagon,
         path_align::{path_align_procedural, static_align_procedural},
-        reset_torpedo::ResetTorpedo,
         slalom::slalom,
         sonar::sonar,
         spin::spin,
@@ -152,6 +151,13 @@ static SHUTDOWN_GUARD: Semaphore = Semaphore::const_new(1);
 #[tokio::main]
 async fn main() {
     let (shutdown_tx, mission_ct) = shutdown_handler().await;
+
+    let stream = rerun::RecordingStreamBuilder::new("SWS9")
+        .connect_grpc_opts("rerun+http://0.0.0.0:9876/proxy")
+        .unwrap();
+
+    // Set global recording stream, ignoring previous recording (there should not be one)
+    let _ = rerun::RecordingStream::set_global(rerun::StoreKind::Recording, Some(stream));
 
     let orig_hook = std::panic::take_hook();
     let mission_ct_clone = mission_ct.clone();
