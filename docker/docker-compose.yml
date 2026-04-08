@@ -34,9 +34,6 @@ services:
 
   yolo_ros:
     image: "yolo_ros:latest"
-    # build:
-    #   context: ./yolo_ros
-    #   dockerfile: Dockerfile
     network_mode: "host"
     privileged: true
     runtime: nvidia
