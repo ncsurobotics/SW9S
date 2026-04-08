@@ -4,8 +4,6 @@ set -e
 source /ws/install/setup.bash
 
 echo "Launching Driver Module"
-if [[ "$SW9_ARCH" == "kilted-latest" ]]; then
-
 if [[ "$SW9_ARCH" == "kilted-arm64-latest" ]]; then
     echo "Running on ARM architecture."
     ros2 launch depthai_ros_driver driver.launch.py rs_compat:=true &

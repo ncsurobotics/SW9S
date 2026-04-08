@@ -7,6 +7,7 @@ services:
     environment:
       - ROS_DOMAIN_ID=0
       - FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml
+      - SW9_ARCH=${SW9_ARCH}
     healthcheck:
       test: 
         - "CMD-SHELL"
