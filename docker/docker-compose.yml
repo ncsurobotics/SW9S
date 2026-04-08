@@ -16,10 +16,10 @@ services:
           /bin/bash -c "export FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml && \
           source /opt/ros/kilted/setup.bash && \
           ros2 topic echo --once /camera/camera/color/camera_info"
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      interval: 5s
+      timeout: 5s
+      retries: 2
+      start_period: 15s
     deploy:
       restart_policy:
         condition: on-failure
@@ -61,10 +61,10 @@ services:
           /bin/bash -c "export FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml && \
           source /opt/ros/kilted/setup.bash && \
           ros2 topic echo --once /yolo/dbg_image"
-      interval: 10s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
+      interval: 5s
+      timeout: 5s
+      retries: 2
+      start_period: 15s
 
     deploy:
       restart_policy:
