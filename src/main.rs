@@ -6,7 +6,7 @@ use std::process::exit;
 use std::time::Duration;
 use sw9s_lib::{
     comms::{
-        control_board::{ControlBoard, SensorStatuses},
+        control_board::{ControlBoard, MotorMatrix, SensorStatuses, VehicleDefinition},
         meb::MainElectronicsBoard,
         zed_ros2::ZedRos2,
     },
@@ -62,7 +62,22 @@ async fn control_board() -> &'static ControlBoard<WriteHalf<SerialStream>> {
     let config = config().await;
     CONTROL_BOARD_CELL
         .get_or_init(|| async {
-            let board = ControlBoard::serial(config.control_board_path.as_str()).await;
+            let motor_matrix = MotorMatrix::builder(8)
+                .set_row(1, [-1.0, 1.0, 0.0, 0.0, 0.0, -1.0].into())
+                .set_row(2, [1.0, 1.0, 0.0, 0.0, 0.0, 1.0].into())
+                .set_row(3, [-1.0, -1.0, 0.0, 0.0, 0.0, 1.0].into())
+                .set_row(4, [1.0, -1.0, 0.0, 0.0, 0.0, -1.0].into())
+                .set_row(5, [0.0, 0.0, -1.0, 1.0, -1.0, 0.0].into())
+                .set_row(6, [0.0, 0.0, -1.0, 1.0, 1.0, 0.0].into())
+                .set_row(7, [0.0, 0.0, -1.0, -1.0, -1.0, 0.0].into())
+                .set_row(8, [0.0, 0.0, -1.0, -1.0, 1.0, 0.0].into())
+                .build();
+            let vehicle_def = VehicleDefinition::new(
+                motor_matrix,
+                [true, true, false, false, true, false, false, true].into(),
+                [0.7071, 0.7071, 1.0, 0.4413, 1.0, 0.8139],
+            )
+            let board = ControlBoard::serial(config.control_board_path.as_str(), vehicle_def).await;
             match board {
                 Ok(x) => x,
                 Err(e) => {

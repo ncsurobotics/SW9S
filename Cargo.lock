@@ -1926,6 +1926,7 @@ dependencies = [
  "ros2-interfaces-jazzy-serde",
  "serde",
  "serde_json",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-serial",
  "tokio-util",

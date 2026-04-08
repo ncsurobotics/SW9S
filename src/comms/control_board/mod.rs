@@ -2,6 +2,7 @@ use core::fmt::Debug;
 use std::{ops::Deref, sync::Arc, time::Duration};
 
 use anyhow::{anyhow, bail, Result};
+use thiserror::Error;
 use tokio::{
     io::{self, AsyncRead, AsyncWrite, AsyncWriteExt, WriteHalf},
     net::TcpStream,
@@ -17,7 +18,6 @@ use self::{
 
 use super::auv_control_board::{AUVControlBoard, MessageId};
 use crate::logln;
-use std::marker::PhantomData;
 
 pub mod response;
 pub mod util;
@@ -46,23 +46,62 @@ impl<T: AsyncWriteExt + Unpin> Deref for ControlBoard<T> {
     }
 }
 
-/// Contains a *populated* DoF matrix. Intended for us in [`init_matrices`].
-/// Can onlly be created using DoFMatrixBuilder.
-#[derive(Debug)]
-pub struct DoFMatrix(pub(crate) [Option<MotorMatrixRowParams>; 8]);
+type ThrusterInversions = Vec<bool>;
+type DofSpeeds = [f32; 6];
 
-/// A builder for DoFMatrix. This struct makes it cleaner to define thruster parameters,
+pub struct VehicleDefinition {
+    pub(crate) motor_matrix: MotorMatrix,
+    pub(crate) thruster_inversions: ThrusterInversions,
+    pub(crate) dof_speeds: DofSpeeds,
+}
+
+impl VehicleDefinition {
+    pub fn new(
+        motor_matrix: MotorMatrix,
+        thruster_inversions: ThrusterInversions,
+        dof_speeds: DofSpeeds,
+    ) -> Result<Self, ControlBoardError> {
+        use ControlBoardError::*;
+
+        let rows = motor_matrix.0.iter().map(|r| r.is_some() as u8).sum();
+        let inversions = thruster_inversions.len();
+
+        if rows != inversions as u8 {
+            Err(ThrusterMismatch { rows, inversions })
+        } else {
+            Ok(Self {
+                motor_matrix,
+                thruster_inversions,
+                dof_speeds,
+            })
+        }
+    }
+}
+
+/// Contains a *populated* motor matrix.
+/// Can only be created using [`MotorMatrixBuilder`].
+#[derive(Debug)]
+pub struct MotorMatrix(pub(crate) [Option<MotorMatrixRowParams>; 8]);
+
+impl MotorMatrix {
+    /// Creates a new [`MotorMatrixBuilder`]
+    pub fn builder(thrusters_in_use: u8) -> MotorMatrixBuilder {
+        MotorMatrixBuilder::new(thrusters_in_use)
+    }
+}
+
+/// A builder for MotorMatrix. This struct makes it cleaner to define thruster parameters,
 /// as well as validate that the correct amount of thrusters have a definition.
 #[derive(Debug)]
-pub struct DoFMatrixBuilder {
+pub struct MotorMatrixBuilder {
     pub(crate) params: [Option<MotorMatrixRowParams>; 8],
     pub(crate) thrusters_in_use: u8,
 }
 
-impl DoFMatrixBuilder {
+impl MotorMatrixBuilder {
     /// Creates an unpopulated builder.
     pub fn new(thrusters_in_use: u8) -> Self {
-        DoFMatrixBuilder {
+        MotorMatrixBuilder {
             params: [None, None, None, None, None, None, None, None],
             thrusters_in_use,
         }
@@ -75,14 +114,15 @@ impl DoFMatrixBuilder {
         self
     }
 
-    pub fn build(self) -> DoFMatrix {
+    /// Build the populated [`MotorMatrix`]
+    pub fn build(self) -> MotorMatrix {
         // Make sure that we currently have parameters for `thrusters_in_use` thrusters.
         let thrusters_defined = self.params.iter().filter(|x| x.is_some()).count();
 
         assert_eq!(thrusters_defined, self.thrusters_in_use as usize);
 
         // Make sure that all of the arrays contain `Some()`
-        DoFMatrix(self.params)
+        MotorMatrix(self.params)
     }
 }
 
@@ -112,13 +152,31 @@ impl MotorMatrixRowParams {
     }
 }
 
+impl From<[f32; 6]> for MotorMatrixRowParams {
+    fn from(vals: [f32; 6]) -> Self {
+        Self {
+            x: vals[0],
+            y: vals[1],
+            z: vals[2],
+            pitch: vals[3],
+            roll: vals[4],
+            yaw: vals[5],
+        }
+    }
+}
+
+#[derive(Error, Debug)]
+pub enum ControlBoardError {
+    #[error("number of motor matrix rows and number of thruster inversions do not match: {rows:?} rows, {inversions:?} inversions")]
+    ThrusterMismatch { rows: u8, inversions: usize },
+}
+
 impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
     pub async fn new<U>(
         comm_out: T,
         comm_in: U,
         msg_id: Option<MessageId>,
-        thruster_inversions: Vec<bool>,
-        dof_speeds: &[f32; 6],
+        vehicle_defintion: VehicleDefinition,
     ) -> Result<Self>
     where
         U: 'static + AsyncRead + Unpin + Send,
@@ -130,24 +188,23 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
             initial_angles: Arc::default(),
         };
 
-        const THRUSTER_COUNT: u8 = 8;
-        let dof_matrix = DoFMatrixBuilder::new(THRUSTER_COUNT)
-            .set_row(1, MotorMatrixRowParams::new(-1.0, 1.0, 0.0, 0.0, 0.0, -1.0))
-            .set_row(2, MotorMatrixRowParams::new(1.0, 1.0, 0.0, 0.0, 0.0, 1.0))
-            .set_row(3, MotorMatrixRowParams::new(-1.0, -1.0, 0.0, 0.0, 0.0, 1.0))
-            .set_row(4, MotorMatrixRowParams::new(1.0, -1.0, 0.0, 0.0, 0.0, -1.0))
-            .set_row(5, MotorMatrixRowParams::new(0.0, 0.0, -1.0, 1.0, -1.0, 0.0))
-            .set_row(6, MotorMatrixRowParams::new(0.0, 0.0, -1.0, 1.0, 1.0, 0.0))
-            .set_row(
-                7,
-                MotorMatrixRowParams::new(0.0, 0.0, -1.0, -1.0, -1.0, 0.0),
-            )
-            .set_row(8, MotorMatrixRowParams::new(0.0, 0.0, -1.0, -1.0, 1.0, 0.0))
-            .build();
+        // const THRUSTER_COUNT: u8 = 8;
+        // let motor_matrix = MotorMatrixBuilder::new(THRUSTER_COUNT)
+        //     .set_row(1, MotorMatrixRowParams::new(-1.0, 1.0, 0.0, 0.0, 0.0, -1.0))
+        //     .set_row(2, MotorMatrixRowParams::new(1.0, 1.0, 0.0, 0.0, 0.0, 1.0))
+        //     .set_row(3, MotorMatrixRowParams::new(-1.0, -1.0, 0.0, 0.0, 0.0, 1.0))
+        //     .set_row(4, MotorMatrixRowParams::new(1.0, -1.0, 0.0, 0.0, 0.0, -1.0))
+        //     .set_row(5, MotorMatrixRowParams::new(0.0, 0.0, -1.0, 1.0, -1.0, 0.0))
+        //     .set_row(6, MotorMatrixRowParams::new(0.0, 0.0, -1.0, 1.0, 1.0, 0.0))
+        //     .set_row(7, MotorMatrixRowParams::new(0.0, 0.0, -1.0, -1.0, -1.0, 0.0))
+        //     .set_row(8, MotorMatrixRowParams::new(0.0, 0.0, -1.0, -1.0, 1.0, 0.0))
+        //     .build();
 
-        this.init_matrices(dof_matrix).await?;
-        this.thruster_inversion_set(thruster_inversions).await?;
-        this.relative_dof_speed_set_batch(dof_speeds).await?;
+        this.init_matrices(vehicle_defintion.motor_matrix).await?;
+        this.thruster_inversion_set(vehicle_defintion.thruster_inversions)
+            .await?;
+        this.relative_dof_speed_set_batch(&vehicle_defintion.dof_speeds)
+            .await?;
         this.bno055_imu_axis_config(BNO055AxisConfig::P6).await?;
 
         loop {
@@ -186,29 +243,9 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         }
         Ok(this)
     }
-    pub async fn new_with_defaults<U>(
-        comm_out: T,
-        comm_in: U,
-        msg_id: Option<MessageId>,
-    ) -> Result<Self>
-    where
-        U: 'static + AsyncRead + Unpin + Send,
-    {
-        const THRUSTER_INVS: [bool; 8] = [true, true, false, false, true, false, false, true];
-        #[allow(clippy::approx_constant)]
-        const DOF_SPEEDS: [f32; 6] = [0.7071, 0.7071, 1.0, 0.4413, 1.0, 0.8139];
-        Self::new(
-            comm_out,
-            comm_in,
-            msg_id,
-            Vec::from(THRUSTER_INVS),
-            &DOF_SPEEDS,
-        )
-        .await
-    }
 
-    async fn init_matrices(&self, dof_matrix: DoFMatrix) -> Result<()> {
-        for (i, _row) in dof_matrix.0.iter().enumerate() {
+    async fn init_matrices(&self, motor_matrix: MotorMatrix) -> Result<()> {
+        for (i, _row) in motor_matrix.0.iter().enumerate() {
             // If the row is defined for the thruster, then set it
             if let Some(row) = _row {
                 self.motor_matrix_set(i as u8, row.x, row.y, row.z, row.pitch, row.roll, row.yaw)
@@ -217,25 +254,6 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         }
 
         self.motor_matrix_update().await
-
-        // self.motor_matrix_set(3, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0)
-        //     .await?;
-        // self.motor_matrix_set(4, 1.0, -1.0, 0.0, 0.0, 0.0, -1.0)
-        //     .await?;
-        // self.motor_matrix_set(1, -1.0, 1.0, 0.0, 0.0, 0.0, -1.0)
-        //     .await?;
-        // self.motor_matrix_set(2, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-        //     .await?;
-        // self.motor_matrix_set(7, 0.0, 0.0, -1.0, -1.0, -1.0, 0.0)
-        //     .await?;
-        // self.motor_matrix_set(8, 0.0, 0.0, -1.0, -1.0, 1.0, 0.0)
-        //     .await?;
-        // self.motor_matrix_set(5, 0.0, 0.0, -1.0, 1.0, -1.0, 0.0)
-        //     .await?;
-        // self.motor_matrix_set(6, 0.0, 0.0, -1.0, 1.0, 1.0, 0.0)
-        //     .await?;
-
-        // self.motor_matrix_update().await
     }
 
     async fn stab_tune(&self) -> Result<()> {
@@ -251,7 +269,7 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
 }
 
 impl ControlBoard<WriteHalf<SerialStream>> {
-    pub async fn serial(port_name: &str) -> Result<Self> {
+    pub async fn serial(port_name: &str, vehicle_defintion: VehicleDefinition) -> Result<Self> {
         const BAUD_RATE: u32 = 9600;
         const DATA_BITS: DataBits = DataBits::Eight;
         const PARITY: Parity = Parity::None;
@@ -262,14 +280,19 @@ impl ControlBoard<WriteHalf<SerialStream>> {
             .parity(PARITY)
             .stop_bits(STOP_BITS);
         let (comm_in, comm_out) = io::split(SerialStream::open(&port_builder)?);
-        Self::new(comm_out, comm_in, None).await
+        Self::new(comm_out, comm_in, None, vehicle_defintion).await
     }
 }
 
 impl ControlBoard<WriteHalf<TcpStream>> {
     /// Both connections are necessary for the simulator to run,
     /// but the one that doesn't feed forward to control board is unnecessary
-    pub async fn tcp(host: &str, port: &str, dummy_port: String) -> Result<Self> {
+    pub async fn tcp(
+        host: &str,
+        port: &str,
+        dummy_port: String,
+        vehicle_defintion: VehicleDefinition,
+    ) -> Result<Self> {
         let host = host.to_string();
         let host_clone = host.clone();
         tokio::spawn(async move {
@@ -284,7 +307,7 @@ impl ControlBoard<WriteHalf<TcpStream>> {
 
         let stream = TcpStream::connect(host.to_string() + ":" + port).await?;
         let (comm_in, comm_out) = io::split(stream);
-        Self::new(comm_out, comm_in, None).await
+        Self::new(comm_out, comm_in, None, vehicle_defintion).await
     }
 }
 
