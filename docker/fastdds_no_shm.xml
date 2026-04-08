@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!--
+  FastDDS UDP-only profile for containerised ROS 2.
+
+  Shared memory is intentionally disabled. Docker containers have isolated
+  /dev/shm even with network_mode: host, so FastDDS SHM transport silently
+  fails across container boundaries — topics are discoverable via UDP multicast
+  but data never arrives. Forcing UDP-only makes all participants use the same
+  transport path.
+
+  The large send/receive buffer sizes (16 MB) are needed because camera images
+  are fragmented into many UDP datagrams. The OS socket buffer limits must also
+  be raised to match — see /etc/sysctl.d/60-ros2-udp-buffers.conf.
+-->
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>udpv4_transport</transport_id>
+      <type>UDPv4</type>
+      <sendBufferSize>16777216</sendBufferSize>
+      <receiveBufferSize>16777216</receiveBufferSize>
+    </transport_descriptor>
+  </transport_descriptors>
+
+  <participant profile_name="participant_profile" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>udpv4_transport</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+    </rtps>
+  </participant>
+
+</profiles>

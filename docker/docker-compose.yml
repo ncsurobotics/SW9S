@@ -1,0 +1,73 @@
+services:
+  depthai_node:
+    image: "luxonis/depthai-ros:kilted-latest"
+    network_mode: "host"
+    privileged: true
+    runtime: nvidia
+    environment:
+      - ROS_DOMAIN_ID=0
+      - FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 2s
+        max_attempts: 10
+        window: 120s
+      resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: all
+                capabilities: [gpu]
+    entrypoint: ["/bin/bash", "-c", "/root/ROS/depthai-entrypoint.sh"]
+    working_dir: /root/ROS
+    user: root
+    volumes:
+      - ./:/root/ROS
+      - /dev:/dev
+    # healthcheck:
+    #   test: ["CMD-SHELL", "ros2 topic list 2>/dev/null | grep /camera/camera/"]
+    #   interval: 4s
+    #   timeout: 10s
+    #   retries: 5
+    #   start_period: 30s
+
+  yolo_ros:
+    image: "yolo_ros:latest"
+    # build:
+    #   context: ./yolo_ros
+    #   dockerfile: Dockerfile
+    network_mode: "host"
+    privileged: true
+    runtime: nvidia
+    environment:
+      - ROS_DOMAIN_ID=0
+      - FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml
+    depends_on:
+      depthai_node:
+        condition: service_started
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 2s
+        max_attempts: 3
+        window: 120s
+      resources:
+          reservations:
+            devices:
+              - driver: nvidia
+                count: all
+                capabilities: [gpu]
+    entrypoint: ["/bin/bash", "-c", "/root/ROS/yolo-entrypoint.sh"]
+    working_dir: /root/ROS
+    user: root
+    volumes:
+      - ./:/root/ROS
+      - /dev:/dev
+    # healthcheck:
+    #   test: ["CMD-SHELL", "ros2 topic list 2>/dev/null | grep /yolo/"]
+    #   interval: 4s
+    #   timeout: 10s
+    #   retries: 5
+    #   start_period: 30s
+
