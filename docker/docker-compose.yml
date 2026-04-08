@@ -1,12 +1,23 @@
 services:
   depthai_node:
-    image: "luxonis/depthai-ros:kilted-latest"
+    image: "luxonis/depthai-ros:${SW9_ARCH:-kilted-latest}"
     network_mode: "host"
     privileged: true
     runtime: nvidia
     environment:
       - ROS_DOMAIN_ID=0
       - FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml
+    healthcheck:
+      test: 
+        - "CMD-SHELL"
+        - |
+          /bin/bash -c "export FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml && \
+          source /opt/ros/kilted/setup.bash && \
+          ros2 topic echo --once /camera/camera/color/camera_info"
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     deploy:
       restart_policy:
         condition: on-failure
@@ -14,25 +25,22 @@ services:
         max_attempts: 10
         window: 120s
       resources:
-          reservations:
-            devices:
-              - driver: nvidia
-                count: all
-                capabilities: [gpu]
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     entrypoint: ["/bin/bash", "-c", "/root/ROS/depthai-entrypoint.sh"]
     working_dir: /root/ROS
     user: root
     volumes:
-      - ./:/root/ROS
+      - ${SW9_DOCKER_WORKING_DIR}:/root/ROS
       - /dev:/dev
-    # healthcheck:
-    #   test: ["CMD-SHELL", "ros2 topic list 2>/dev/null | grep /camera/camera/"]
-    #   interval: 4s
-    #   timeout: 10s
-    #   retries: 5
-    #   start_period: 30s
 
   yolo_ros:
+    build:
+      context: ${SW9_DOCKER_WORKING_DIR}/yolo-ros
+      dockerfile: Dockerfile
     image: "yolo_ros:latest"
     network_mode: "host"
     privileged: true
@@ -42,7 +50,19 @@ services:
       - FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml
     depends_on:
       depthai_node:
-        condition: service_started
+        condition: service_healthy
+    healthcheck:
+      test: 
+        - "CMD-SHELL"
+        - |
+          /bin/bash -c "export FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml && \
+          source /opt/ros/kilted/setup.bash && \
+          ros2 topic echo --once /yolo/dbg_image"
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
     deploy:
       restart_policy:
         condition: on-failure
@@ -50,21 +70,14 @@ services:
         max_attempts: 3
         window: 120s
       resources:
-          reservations:
-            devices:
-              - driver: nvidia
-                count: all
-                capabilities: [gpu]
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     entrypoint: ["/bin/bash", "-c", "/root/ROS/yolo-entrypoint.sh"]
     working_dir: /root/ROS
     user: root
     volumes:
-      - ./:/root/ROS
+      - ${SW9_DOCKER_WORKING_DIR}:/root/ROS
       - /dev:/dev
-    # healthcheck:
-    #   test: ["CMD-SHELL", "ros2 topic list 2>/dev/null | grep /yolo/"]
-    #   interval: 4s
-    #   timeout: 10s
-    #   retries: 5
-    #   start_period: 30s
-

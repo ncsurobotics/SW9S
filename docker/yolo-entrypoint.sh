@@ -4,9 +4,6 @@ set -e
 source /opt/ros/kilted/setup.bash
 source /root/ros2_ws/install/setup.bash
 
-echo "SLEEPING...."
-sleep 6
-
 ros2 launch yolo_bringup yolo.launch.py\
   model:=/root/ROS/yolov8n-face.pt \
   device:=cuda:0 \
