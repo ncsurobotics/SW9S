@@ -1,7 +1,7 @@
 use core::fmt::Debug;
 use std::{ops::Deref, sync::Arc, time::Duration};
 
-use anyhow::{anyhow, bail, Result};
+// use anyhow::{anyhow, bail, Result};
 use thiserror::Error;
 use tokio::{
     io::{self, AsyncRead, AsyncWrite, AsyncWriteExt, WriteHalf},
@@ -27,6 +27,26 @@ pub enum SensorStatuses {
     DepthNr,
     AllGood,
 }
+
+#[derive(Error, Debug)]
+pub enum ControlBoardError {
+    #[error("number of motor matrix rows and number of thruster inversions do not match: {rows:?} rows, {inversions:?} inversions")]
+    ThrusterMismatch { rows: u8, inversions: usize },
+    #[error("thruster index '{0}' is outside of the allowed range 1-8")]
+    ThrusterIndexing(u8),
+    #[error("failed to initialize serial comms with control board")]
+    InitSerial(#[from] tokio_serial::Error),
+    #[error("tcp connect failed")]
+    TcpConnect(#[from] io::Error),
+    #[error("failed to set initial yaw")]
+    InitialYawSet,
+    #[error("{0} is not a valid PID tune, pick from [X, Y, Z, D]")]
+    InvalidPidTuneAxis(char),
+    #[error("acknowledge failed")]
+    AcknowledgeErr(#[from] super::auv_control_board::util::AcknowledgeErr),
+}
+
+pub type Result<T, E = ControlBoardError> = core::result::Result<T, E>;
 
 pub static LAST_YAW: std::sync::Mutex<Option<f32>> = std::sync::Mutex::new(None);
 
@@ -60,7 +80,7 @@ impl VehicleDefinition {
         motor_matrix: MotorMatrix,
         thruster_inversions: ThrusterInversions,
         dof_speeds: DofSpeeds,
-    ) -> Result<Self, ControlBoardError> {
+    ) -> Result<Self> {
         use ControlBoardError::*;
 
         let rows = motor_matrix.0.iter().map(|r| r.is_some() as u8).sum();
@@ -165,18 +185,12 @@ impl From<[f32; 6]> for MotorMatrixRowParams {
     }
 }
 
-#[derive(Error, Debug)]
-pub enum ControlBoardError {
-    #[error("number of motor matrix rows and number of thruster inversions do not match: {rows:?} rows, {inversions:?} inversions")]
-    ThrusterMismatch { rows: u8, inversions: usize },
-}
-
 impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
     pub async fn new<U>(
         comm_out: T,
         comm_in: U,
         msg_id: Option<MessageId>,
-        vehicle_defintion: VehicleDefinition,
+        vehicle_defintion: &VehicleDefinition,
     ) -> Result<Self>
     where
         U: 'static + AsyncRead + Unpin + Send,
@@ -200,8 +214,8 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         //     .set_row(8, MotorMatrixRowParams::new(0.0, 0.0, -1.0, -1.0, 1.0, 0.0))
         //     .build();
 
-        this.init_matrices(vehicle_defintion.motor_matrix).await?;
-        this.thruster_inversion_set(vehicle_defintion.thruster_inversions)
+        this.init_matrices(&vehicle_defintion.motor_matrix).await?;
+        this.thruster_inversion_set(&vehicle_defintion.thruster_inversions)
             .await?;
         this.relative_dof_speed_set_batch(&vehicle_defintion.dof_speeds)
             .await?;
@@ -244,7 +258,7 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         Ok(this)
     }
 
-    async fn init_matrices(&self, motor_matrix: MotorMatrix) -> Result<()> {
+    async fn init_matrices(&self, motor_matrix: &MotorMatrix) -> Result<()> {
         for (i, _row) in motor_matrix.0.iter().enumerate() {
             // If the row is defined for the thruster, then set it
             if let Some(row) = _row {
@@ -269,7 +283,7 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
 }
 
 impl ControlBoard<WriteHalf<SerialStream>> {
-    pub async fn serial(port_name: &str, vehicle_defintion: VehicleDefinition) -> Result<Self> {
+    pub async fn serial(port_name: &str, vehicle_defintion: &VehicleDefinition) -> Result<Self> {
         const BAUD_RATE: u32 = 9600;
         const DATA_BITS: DataBits = DataBits::Eight;
         const PARITY: Parity = Parity::None;
@@ -307,7 +321,7 @@ impl ControlBoard<WriteHalf<TcpStream>> {
 
         let stream = TcpStream::connect(host.to_string() + ":" + port).await?;
         let (comm_in, comm_out) = io::split(stream);
-        Self::new(comm_out, comm_in, None, vehicle_defintion).await
+        Self::new(comm_out, comm_in, None, &vehicle_defintion).await
     }
 }
 
@@ -336,7 +350,7 @@ impl<T: AsyncWrite + Unpin> ControlBoard<T> {
         message.extend(MOTOR_MATRIX_SET);
 
         if !(1..=8).contains(&thruster) {
-            bail!("{thruster} is outside the allowed range 1-8.")
+            return Err(ControlBoardError::ThrusterIndexing(thruster));
         };
 
         message.extend(thruster.to_le_bytes());
@@ -356,7 +370,7 @@ impl<T: AsyncWrite + Unpin> ControlBoard<T> {
     ///
     /// # Arguments:
     /// * `inversions` - Array of invert statuses, with motor 1 at index 0
-    pub async fn thruster_inversion_set(&self, inversions: Vec<bool>) -> Result<()> {
+    pub async fn thruster_inversion_set(&self, inversions: &Vec<bool>) -> Result<()> {
         const THRUSTER_INVERSION_SET: [u8; 4] = *b"TINV";
         let mut message = Vec::from(THRUSTER_INVERSION_SET);
 
@@ -488,7 +502,7 @@ impl<T: AsyncWrite + Unpin> ControlBoard<T> {
             None => {
                 self.set_initial_angle().await?;
                 let angle =
-                    (*self.initial_angles.lock().await).ok_or(anyhow!("Initial Yaw set Error"))?;
+                    (*self.initial_angles.lock().await).ok_or(ControlBoardError::InitialYawSet)?;
                 *angle.yaw()
             }
         };
@@ -556,7 +570,7 @@ impl<T: AsyncWrite + Unpin> ControlBoard<T> {
         message.extend(STAB_TUNE);
 
         if !['X', 'Y', 'Z', 'D'].contains(&which) {
-            bail!("{which} is not a valid PID tune, pick from [X, Y, Z, D]")
+            return Err(ControlBoardError::InvalidPidTuneAxis(which));
         }
         message.push(which as u8);
 

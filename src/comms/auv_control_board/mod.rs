@@ -1,12 +1,12 @@
 use core::fmt::Debug;
 use std::sync::Arc;
 
-use anyhow::Result;
 use tokio::{io::AsyncWriteExt, sync::Mutex};
 
 use self::util::{crc_itt16_false, AcknowledgeErr};
 
 use super::auv_control_board::util::{END_BYTE, ESCAPE_BYTE, START_BYTE};
+use super::control_board::Result;
 
 pub mod response;
 pub mod util;

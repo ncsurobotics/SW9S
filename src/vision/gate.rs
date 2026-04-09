@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use opencv::{core::Size, prelude::Mat};
 
 use crate::load_onnx;

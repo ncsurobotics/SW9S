@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use derive_getters::Getters;
 use itertools::Itertools;
 use num_traits::{zero, FromPrimitive, Num};
@@ -480,7 +480,7 @@ impl Mul<&Mat> for PosVector {
 }
 
 impl Draw for VisualDetection<bool, Offset2D<f64>> {
-    fn draw(&self, canvas: &mut Mat) -> anyhow::Result<()> {
+    fn draw(&self, canvas: &mut Mat) -> Result<()> {
         let color = if self.class {
             Scalar::from((0.0, 255.0, 0.0))
         } else {

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use anyhow::Result;
+use thiserror::Error;
 use tokio::{
     io::{AsyncReadExt, AsyncWrite, AsyncWriteExt, WriteHalf},
     sync::Mutex,
@@ -12,6 +12,16 @@ use self::response::Statuses;
 use super::auv_control_board::{AUVControlBoard, MessageId};
 
 pub mod response;
+
+#[derive(Error, Debug)]
+pub enum MebError {
+    #[error("failed to initialized serial comms with MEB")]
+    InitSerial(#[from] tokio_serial::Error),
+    #[error("sending message failed")]
+    SendMessage(#[from] super::control_board::ControlBoardError),
+}
+
+pub type Result<T, E = MebError> = core::result::Result<T, E>;
 
 #[derive(Debug)]
 pub struct MainElectronicsBoard<C: AsyncWrite + Unpin> {
@@ -83,8 +93,8 @@ pub enum MebCmd {
 }
 
 impl<C: AsyncWriteExt + Unpin> MainElectronicsBoard<C> {
-    pub async fn send_msg(&self, cmd: MebCmd) -> anyhow::Result<()> {
+    pub async fn send_msg(&self, cmd: MebCmd) -> Result<()> {
         let formatted_cmd: [u8; 4] = [b'M', b'S', b'B', cmd as u8];
-        self.board.write_out_basic(formatted_cmd.to_vec()).await
+        Ok(self.board.write_out_basic(formatted_cmd.to_vec()).await?)
     }
 }

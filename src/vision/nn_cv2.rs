@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use derive_getters::Getters;
 use opencv::{
     core::{Rect2d, Scalar, Size, VecN, Vector, CV_32F},

@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use color_eyre::eyre::{bail, Result};
 use std::env::temp_dir;
 
 use std::env;
@@ -50,7 +50,7 @@ async fn config() -> &'static Config {
     CONFIG_CELL
         .get_or_init(|| async {
             Config::new().unwrap_or_else(|e| {
-                logln!("Error getting config file: {:#?}\nUsing default config", e);
+                logln!("Error getting config file: {e}\nUsing default config");
                 Config::default()
             })
         })
@@ -77,17 +77,22 @@ async fn control_board() -> &'static ControlBoard<WriteHalf<SerialStream>> {
                 [true, true, false, false, true, false, false, true].into(),
                 [0.7071, 0.7071, 1.0, 0.4413, 1.0, 0.8139],
             )
-            let board = ControlBoard::serial(config.control_board_path.as_str(), vehicle_def).await;
+            .inspect_err(|e| logln!("Invalid vehicle definition: {:#?}", e))
+            .unwrap();
+            let board =
+                ControlBoard::serial(config.control_board_path.as_str(), &vehicle_def).await;
             match board {
                 Ok(x) => x,
                 Err(e) => {
-                    logln!("Error initializing control board: {:#?}", e);
-                    let backup_board =
-                        ControlBoard::serial(config.control_board_backup_path.as_str())
-                            .await
-                            .unwrap();
+                    logln!("Error initializing control board: {e}");
+                    let backup_board = ControlBoard::serial(
+                        config.control_board_backup_path.as_str(),
+                        &vehicle_def,
+                    )
+                    .await
+                    .unwrap();
                     backup_board.reset().await.unwrap();
-                    ControlBoard::serial(config.control_board_path.as_str())
+                    ControlBoard::serial(config.control_board_path.as_str(), &vehicle_def)
                         .await
                         .unwrap()
                 }
@@ -166,6 +171,7 @@ static SHUTDOWN_GUARD: Semaphore = Semaphore::const_new(1);
 
 #[tokio::main]
 async fn main() {
+    color_eyre::install().unwrap();
     let (shutdown_tx, mission_ct) = shutdown_handler().await;
 
     let orig_hook = std::panic::take_hook();

@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use derive_getters::Getters;
 use opencv::core::{multiply, BORDER_CONSTANT, CV_8U};
 use opencv::imgproc::{dilate, morphology_default_border_value};

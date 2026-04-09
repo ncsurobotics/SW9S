@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::eyre::Result;
 
 use core::fmt::Debug;
 use std::{marker::PhantomData, sync::Arc, thread};

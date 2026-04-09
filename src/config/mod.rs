@@ -10,7 +10,7 @@ pub mod spin;
 use std::fs::read_to_string;
 
 use crate::vision::Yuv;
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::RangeInclusive;

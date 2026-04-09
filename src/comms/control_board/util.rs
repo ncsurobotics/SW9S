@@ -1,6 +1,6 @@
 use std::f32::consts::PI;
 
-use anyhow::bail;
+use color_eyre::eyre::bail;
 use derive_getters::Getters;
 
 /// See <https://cdn-shop.adafruit.com/datasheets/BST_BNO055_DS000_12.pdf>,
@@ -18,7 +18,7 @@ pub enum BNO055AxisConfig {
 }
 
 impl TryFrom<u8> for BNO055AxisConfig {
-    type Error = anyhow::Error;
+    type Error = color_eyre::eyre::Error;
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
