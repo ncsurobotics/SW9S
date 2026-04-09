@@ -1,6 +1,13 @@
+# Environment Vars:
+# SW9_DOCKER_WORKING_DIR   Path to this directory
+# DEPTHAI_TAG              docker image tag for depthai image (arm or x86)
+# YOLO_DOCKERFILE          Dockerfile to build yolo_ros (arm or x86)
+# SW9_ARCH                 Arch label
+
+
 services:
   depthai_node:
-    image: "luxonis/depthai-ros:${SW9_ARCH:-kilted-latest}"
+    image: "luxonis/depthai-ros:${DEPTHAI_TAG:-kilted-latest}"
     network_mode: "host"
     privileged: true
     runtime: nvidia
@@ -8,12 +15,16 @@ services:
     environment:
       - ROS_DOMAIN_ID=0
       - FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
       - SW9_ARCH=${SW9_ARCH}
     healthcheck:
-      test: 
+      test:
         - "CMD-SHELL"
         - |
           /bin/bash -c "export FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml && \
+          export RMW_IMPLEMENTATION=rmw_fastrtps_cpp && \
           source /opt/ros/kilted/setup.bash && \
           ros2 topic echo --once /camera/camera/color/camera_info"
       interval: 5s
@@ -42,8 +53,8 @@ services:
   yolo_ros:
     build:
       context: ${SW9_DOCKER_WORKING_DIR}/yolo-ros
-      dockerfile: Dockerfile
-    image: "yolo_ros:latest"
+      dockerfile: ${YOLO_DOCKERFILE:-Dockerfile}
+    image: "yolo_ros:${SW9_ARCH:-latest}"
     network_mode: "host"
     privileged: true
     runtime: nvidia
@@ -51,26 +62,29 @@ services:
     environment:
       - ROS_DOMAIN_ID=0
       - FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
     depends_on:
       depthai_node:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
-      test: 
+      test:
         - "CMD-SHELL"
         - |
           /bin/bash -c "export FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml && \
-          source /opt/ros/kilted/setup.bash && \
+          export RMW_IMPLEMENTATION=rmw_fastrtps_cpp && \
+          (source /opt/ros/jazzy/setup.bash 2>/dev/null || source /opt/ros/kilted/setup.bash) && \
           ros2 topic echo --once /yolo/dbg_image"
       interval: 5s
       timeout: 5s
       retries: 2
-      start_period: 15s
-
+      start_period: 60s
     deploy:
       restart_policy:
         condition: on-failure
-        delay: 2s
-        max_attempts: 3
+        delay: 5s
+        max_attempts: 0
         window: 120s
       resources:
         reservations:

@@ -1,0 +1,42 @@
+FROM dustynv/ros:jazzy-ros-base-r36.4.0-cu128-24.04 AS deps
+
+ENV ROS_DISTRO=jazzy
+
+# Install build tools and ROS packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    build-essential \
+    python3-pip \
+    python3-rosdep \
+    python3-colcon-common-extensions \
+    ros-jazzy-tf2-ros \
+    ros-jazzy-tf2-geometry-msgs \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create ros2_ws and copy source
+WORKDIR /root/ros2_ws
+COPY . /root/ros2_ws/src
+
+# Initialise rosdep (ignore error if already done in base image)
+RUN rosdep init || true && rosdep update --include-eol-distros
+
+# Install ROS package dependencies declared in package.xml files
+RUN apt-get update \
+    && rosdep install --from-paths src --ignore-src -r -y \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python packages
+RUN pip3 install -r src/requirements.txt \
+    --break-system-packages \
+    --ignore-installed \
+    --no-cache-dir
+
+FROM deps AS builder
+
+SHELL ["/bin/bash", "-c"]
+
+RUN source /opt/ros/jazzy/setup.bash && colcon build
+
+RUN echo "source /root/ros2_ws/install/setup.bash" >> ~/.bashrc
+
+CMD ["bash"]

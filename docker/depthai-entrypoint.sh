@@ -4,10 +4,10 @@ set -e
 source /ws/install/setup.bash
 
 echo "Launching Driver Module"
-if [[ "$SW9_ARCH" == "kilted-arm64-latest" ]]; then
+if [[ "$SW9_ARCH" == "jetson" || "$SW9_ARCH" == "arm" ]]; then
     echo "Running on ARM architecture."
     ros2 launch depthai_ros_driver driver.launch.py rs_compat:=true &
-elif [[ "$SW9_ARCH" == "kilted-latest" ]]; then
+elif [[ "$SW9_ARCH" == "x86" ]]; then
     echo "Running on x86 architecture."
     ros2 launch depthai_ros_driver_v3 driver.launch.py rs_compat:=true &
 else

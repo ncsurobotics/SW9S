@@ -1,16 +1,33 @@
 #!/bin/bash
 set -e
 
-source /opt/ros/kilted/setup.bash
-source /root/ros2_ws/install/setup.bash
+if [ -f /opt/ros/jazzy/setup.bash ]; then
+    echo "[yolo-entrypoint] Sourcing ROS Jazzy"
+    source /opt/ros/jazzy/setup.bash
+    source /root/ros2_ws/install/setup.bash
+elif [ -f /opt/ros/kilted/setup.bash ]; then
+    echo "[yolo-entrypoint] Sourcing ROS Kilted"
+    source /opt/ros/kilted/setup.bash
+    source /root/ros2_ws/install/setup.bash
+else
+    echo "[yolo-entrypoint] ERROR: No supported ROS installation found!" >&2
+    exit 1
+fi
 
-ros2 launch yolo_bringup yolo.launch.py\
-  model:=/root/ROS/yolov8n-face.pt \
-  device:=cuda:0 \
-  enable:=True \
-  target_frame:=camera_link \
-  input_image_topic:=/camera/camera/color/image_raw \
-  input_depth_topic:=/camera/camera/depth/image_rect_raw \
-  input_depth_info_topic:=/camera/camera/depth/camera_info \
-  use_3d:=True \
-  use_debug:=True
+echo "[yolo-entrypoint] Waiting for depthai camera topics..."
+until ros2 topic list 2>/dev/null | grep -q "^/camera/camera/color/image_raw$"; do
+    echo "[yolo-entrypoint] Camera not ready yet, retrying in 1 s..."
+    sleep 1
+done
+echo "[yolo-entrypoint] Camera topics detected — launching YOLO."
+
+ros2 launch yolo_bringup yolo.launch.py \
+    model:=/root/ROS/yolov8n-face.pt \
+    device:=cuda:0 \
+    enable:=True \
+    target_frame:=camera_link \
+    input_image_topic:=/camera/camera/color/image_raw \
+    input_depth_topic:=/camera/camera/depth/image_rect_raw \
+    input_depth_info_topic:=/camera/camera/depth/camera_info \
+    use_3d:=True \
+    use_debug:=True
