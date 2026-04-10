@@ -1,3 +1,5 @@
+//! Helper utilities for communicating with the control board
+//!
 // Implementing <https://mb3hel.github.io/AUVControlBoard/user_guide/comm_protocol/>
 use thiserror::Error;
 

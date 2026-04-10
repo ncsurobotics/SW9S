@@ -1,3 +1,4 @@
+//! Response parsing
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 

@@ -1,8 +1,11 @@
+//! High-level implementation of the [AUVControlBoard] messaging specification
+//!
+//! The underlying communication protocol is implemented in the [auv_control_board](crate::comms::auv_control_board) module
+//!
+//! [AUVControlBoard]: https://github.com/ncsurobotics/AUVControlBoard
 use core::fmt::Debug;
 use std::{ops::Deref, sync::Arc, time::Duration};
 
-// use anyhow::{anyhow, bail, Result};
-use thiserror::Error;
 use tokio::{
     io::{self, AsyncRead, AsyncWrite, AsyncWriteExt, WriteHalf},
     net::TcpStream,
@@ -13,7 +16,8 @@ use tokio_serial::{DataBits, Parity, SerialStream, StopBits};
 
 use self::{
     response::ResponseMap,
-    util::{Angles, BNO055AxisConfig},
+    util::{Angles, BNO055AxisConfig, ControlBoardError, Result},
+    vehicle_definition::{MotorMatrix, PidAxes, VehicleDefinition},
 };
 
 use super::auv_control_board::{AUVControlBoard, MessageId};
@@ -21,35 +25,22 @@ use crate::logln;
 
 pub mod response;
 pub mod util;
+pub mod vehicle_definition;
 
+/// Status of the control board's sensors
 pub enum SensorStatuses {
+    /// IMU ready
     ImuNr,
+    /// Depth sensor ready
     DepthNr,
+    /// Sensors healthy
     AllGood,
 }
 
-#[derive(Error, Debug)]
-pub enum ControlBoardError {
-    #[error("number of motor matrix rows and number of thruster inversions do not match: {rows:?} rows, {inversions:?} inversions")]
-    ThrusterMismatch { rows: u8, inversions: usize },
-    #[error("thruster index '{0}' is outside of the allowed range 1-8")]
-    ThrusterIndexing(u8),
-    #[error("failed to initialize serial comms with control board")]
-    InitSerial(#[from] tokio_serial::Error),
-    #[error("tcp connect failed")]
-    TcpConnect(#[from] io::Error),
-    #[error("failed to set initial yaw")]
-    InitialYawSet,
-    #[error("{0} is not a valid PID tune, pick from [X, Y, Z, D]")]
-    InvalidPidTuneAxis(char),
-    #[error("acknowledge failed")]
-    AcknowledgeErr(#[from] super::auv_control_board::util::AcknowledgeErr),
-}
-
-pub type Result<T, E = ControlBoardError> = core::result::Result<T, E>;
-
+/// The last yaw reported by the control board
 pub static LAST_YAW: std::sync::Mutex<Option<f32>> = std::sync::Mutex::new(None);
 
+/// Represents a control board
 #[derive(Debug)]
 pub struct ControlBoard<T>
 where
@@ -63,125 +54,6 @@ impl<T: AsyncWriteExt + Unpin> Deref for ControlBoard<T> {
     type Target = AUVControlBoard<T, ResponseMap>;
     fn deref(&self) -> &Self::Target {
         &self.inner
-    }
-}
-
-type ThrusterInversions = Vec<bool>;
-type DofSpeeds = [f32; 6];
-
-pub struct VehicleDefinition {
-    pub(crate) motor_matrix: MotorMatrix,
-    pub(crate) thruster_inversions: ThrusterInversions,
-    pub(crate) dof_speeds: DofSpeeds,
-}
-
-impl VehicleDefinition {
-    pub fn new(
-        motor_matrix: MotorMatrix,
-        thruster_inversions: ThrusterInversions,
-        dof_speeds: DofSpeeds,
-    ) -> Result<Self> {
-        use ControlBoardError::*;
-
-        let rows = motor_matrix.0.iter().map(|r| r.is_some() as u8).sum();
-        let inversions = thruster_inversions.len();
-
-        if rows != inversions as u8 {
-            Err(ThrusterMismatch { rows, inversions })
-        } else {
-            Ok(Self {
-                motor_matrix,
-                thruster_inversions,
-                dof_speeds,
-            })
-        }
-    }
-}
-
-/// Contains a *populated* motor matrix.
-/// Can only be created using [`MotorMatrixBuilder`].
-#[derive(Debug)]
-pub struct MotorMatrix(pub(crate) [Option<MotorMatrixRowParams>; 8]);
-
-impl MotorMatrix {
-    /// Creates a new [`MotorMatrixBuilder`]
-    pub fn builder(thrusters_in_use: u8) -> MotorMatrixBuilder {
-        MotorMatrixBuilder::new(thrusters_in_use)
-    }
-}
-
-/// A builder for MotorMatrix. This struct makes it cleaner to define thruster parameters,
-/// as well as validate that the correct amount of thrusters have a definition.
-#[derive(Debug)]
-pub struct MotorMatrixBuilder {
-    pub(crate) params: [Option<MotorMatrixRowParams>; 8],
-    pub(crate) thrusters_in_use: u8,
-}
-
-impl MotorMatrixBuilder {
-    /// Creates an unpopulated builder.
-    pub fn new(thrusters_in_use: u8) -> Self {
-        MotorMatrixBuilder {
-            params: [None, None, None, None, None, None, None, None],
-            thrusters_in_use,
-        }
-    }
-
-    /// Sets the parameters for a specific thruster.
-    pub fn set_row(mut self, thruster: u8, parameters: MotorMatrixRowParams) -> Self {
-        let thruster_index = thruster - 1;
-        self.params[thruster_index as usize] = Some(parameters);
-        self
-    }
-
-    /// Build the populated [`MotorMatrix`]
-    pub fn build(self) -> MotorMatrix {
-        // Make sure that we currently have parameters for `thrusters_in_use` thrusters.
-        let thrusters_defined = self.params.iter().filter(|x| x.is_some()).count();
-
-        assert_eq!(thrusters_defined, self.thrusters_in_use as usize);
-
-        // Make sure that all of the arrays contain `Some()`
-        MotorMatrix(self.params)
-    }
-}
-
-/// Each row corresponds to a line of self.motor_matrix_set(...);
-/// Can either be created manually, or the parameters can be dumped into [`Self::new`]
-/// for shorter code.
-#[derive(Debug)]
-pub struct MotorMatrixRowParams {
-    x: f32,
-    y: f32,
-    z: f32,
-    pitch: f32,
-    roll: f32,
-    yaw: f32,
-}
-
-impl MotorMatrixRowParams {
-    pub fn new(x: f32, y: f32, z: f32, pitch: f32, roll: f32, yaw: f32) -> Self {
-        Self {
-            x,
-            y,
-            z,
-            pitch,
-            roll,
-            yaw,
-        }
-    }
-}
-
-impl From<[f32; 6]> for MotorMatrixRowParams {
-    fn from(vals: [f32; 6]) -> Self {
-        Self {
-            x: vals[0],
-            y: vals[1],
-            z: vals[2],
-            pitch: vals[3],
-            roll: vals[4],
-            yaw: vals[5],
-        }
     }
 }
 
@@ -201,18 +73,6 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
             inner: AUVControlBoard::new(Mutex::from(comm_out).into(), responses, msg_id).into(),
             initial_angles: Arc::default(),
         };
-
-        // const THRUSTER_COUNT: u8 = 8;
-        // let motor_matrix = MotorMatrixBuilder::new(THRUSTER_COUNT)
-        //     .set_row(1, MotorMatrixRowParams::new(-1.0, 1.0, 0.0, 0.0, 0.0, -1.0))
-        //     .set_row(2, MotorMatrixRowParams::new(1.0, 1.0, 0.0, 0.0, 0.0, 1.0))
-        //     .set_row(3, MotorMatrixRowParams::new(-1.0, -1.0, 0.0, 0.0, 0.0, 1.0))
-        //     .set_row(4, MotorMatrixRowParams::new(1.0, -1.0, 0.0, 0.0, 0.0, -1.0))
-        //     .set_row(5, MotorMatrixRowParams::new(0.0, 0.0, -1.0, 1.0, -1.0, 0.0))
-        //     .set_row(6, MotorMatrixRowParams::new(0.0, 0.0, -1.0, 1.0, 1.0, 0.0))
-        //     .set_row(7, MotorMatrixRowParams::new(0.0, 0.0, -1.0, -1.0, -1.0, 0.0))
-        //     .set_row(8, MotorMatrixRowParams::new(0.0, 0.0, -1.0, -1.0, 1.0, 0.0))
-        //     .build();
 
         this.init_matrices(&vehicle_defintion.motor_matrix).await?;
         this.thruster_inversion_set(&vehicle_defintion.thruster_inversions)
@@ -270,15 +130,19 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         self.motor_matrix_update().await
     }
 
-    async fn stab_tune(&self) -> Result<()> {
-        self.stability_assist_pid_tune('X', 0.8, 0.0, 0.0, 0.6, false)
+    async fn stab_tune(&self, axes: PidAxes) -> Result<()> {
+        for axis in axes {
+            self.stability_assist_pid_tune(
+                axis.which,
+                axis.kp,
+                axis.ki,
+                axis.kd,
+                axis.limit,
+                axis.invert,
+            )
             .await?;
-        self.stability_assist_pid_tune('Y', 2.0, 0.0, 0.0, 0.1, false)
-            .await?;
-        self.stability_assist_pid_tune('Z', 4.0, 0.0, 0.0, 1.0, false)
-            .await?;
-        self.stability_assist_pid_tune('D', 1.5, 0.0, 0.0, 1.0, false)
-            .await
+        }
+        Ok(())
     }
 }
 

@@ -1,3 +1,4 @@
+//! Modules for communicating with varius subsystems
 pub mod auv_control_board;
 pub mod control_board;
 #[cfg(feature = "meb")]

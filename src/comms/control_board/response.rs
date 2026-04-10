@@ -1,3 +1,4 @@
+//! Response parsing
 use std::{
     collections::HashMap,
     sync::{

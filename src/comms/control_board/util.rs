@@ -1,7 +1,45 @@
+//! Utilities for parsing interacting with the control board
 use std::f32::consts::PI;
 
 use color_eyre::eyre::bail;
 use derive_getters::Getters;
+use thiserror::Error;
+
+/// An error occuring trying to communicate with the control board.
+#[derive(Error, Debug)]
+pub enum ControlBoardError {
+    /// Tried passing a malformed [vehicle definition](VehicleDefinition).
+    ///
+    /// The number of thrusters in the [motor matrix](MotorMatrix) and [thruster inversions vector](ThrusterInversions) do not match.
+    #[error("number of motor matrix rows and number of thruster inversions do not match: {rows:?} rows, {inversions:?} inversions")]
+    ThrusterMismatch { rows: u8, inversions: usize },
+
+    /// Tried passing a thruster index outside of the supported range, 1-8 inclusive.
+    #[error("thruster index '{0}' is outside of the allowed range 1-8")]
+    ThrusterIndexing(u8),
+
+    /// An error occured while initializing comms with a control board through the serial backend.
+    #[error("failed to initialize serial comms with control board")]
+    InitSerial(#[from] tokio_serial::Error),
+
+    /// An error occured while initializing comms with a control board through the TCP backend.
+    #[error("tcp connect failed")]
+    TcpConnect(#[from] tokio::io::Error),
+
+    /// An error occured getting the initial yaw.
+    #[error("failed to set initial yaw")]
+    InitialYawSet,
+
+    /// Tried tuning PID parameters for an axis that is not X, Y, Z, or D.
+    #[error("{0} is not a valid PID tune, pick from [X, Y, Z, D]")]
+    InvalidPidTuneAxis(char),
+
+    /// Received an error from the control board itself.
+    #[error("acknowledge failed")]
+    AcknowledgeErr(#[from] crate::comms::auv_control_board::util::AcknowledgeErr),
+}
+
+pub type Result<T, E = ControlBoardError> = core::result::Result<T, E>;
 
 /// See <https://cdn-shop.adafruit.com/datasheets/BST_BNO055_DS000_12.pdf>,
 /// page 25

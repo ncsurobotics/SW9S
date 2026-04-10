@@ -1,12 +1,17 @@
+//! Low-level implementation of the [AUVControlBoard] communication protocol
+//!
+//! The high-level messaging specification is implemented in the [control_board](crate::comms::control_board) module
+//!
+//! [AUVControlBoard]: https://github.com/ncsurobotics/AUVControlBoard
 use core::fmt::Debug;
 use std::sync::Arc;
 
 use tokio::{io::AsyncWriteExt, sync::Mutex};
 
-use self::util::{crc_itt16_false, AcknowledgeErr};
-
-use super::auv_control_board::util::{END_BYTE, ESCAPE_BYTE, START_BYTE};
-use super::control_board::Result;
+use crate::comms::{
+    auv_control_board::util::{crc_itt16_false, AcknowledgeErr, END_BYTE, ESCAPE_BYTE, START_BYTE},
+    control_board::util::Result,
+};
 
 pub mod response;
 pub mod util;
