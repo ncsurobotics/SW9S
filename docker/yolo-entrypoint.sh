@@ -13,6 +13,7 @@ elif [ -f /opt/ros/kilted/setup.bash ]; then
 elif [ -f /opt/ros/humble/setup.bash ]; then
     echo "[yolo-entrypoint] Sourcing ROS Humble"
     source /opt/ros/humble/setup.bash
+    source /opt/ros/humble/install/setup.bash
     source /root/ros2_ws/install/setup.bash
     source /opt/venv/bin/activate
 else
@@ -20,11 +21,6 @@ else
     exit 1
 fi
 
-# echo "[yolo-entrypoint] Waiting for depthai camera topics..."
-# until ros2 topic list 2>/dev/null | grep -q "^/camera/camera/color/image_raw$"; do
-#     echo "[yolo-entrypoint] Camera not ready yet, retrying in 1 s..."
-#     sleep 1
-# done
 echo "[yolo-entrypoint] Camera topics detected — launching YOLO."
 
 ros2 launch yolo_bringup yolo.launch.py \
