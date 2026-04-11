@@ -1,6 +1,13 @@
 #!/bin/bash
 set -e
 
+if [[$SW9_ARCH == "jetson"]]; then
+    echo '/usr/lib/aarch64-linux-gnu/libcudss/12' > /etc/ld.so.conf.d/cudss.conf
+    ldconfig
+fi
+
+# rest of your existing entrypoint...
+
 if [ -f /opt/ros/jazzy/setup.bash ]; then
     echo "[yolo-entrypoint] Sourcing ROS Jazzy"
     source /opt/ros/jazzy/setup.bash

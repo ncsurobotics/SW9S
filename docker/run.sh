@@ -27,7 +27,7 @@ else
     export YOLO_DOCKERFILE="Dockerfile"
 fi
 
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 export FASTDDS_DEFAULT_PROFILES_FILE="${SW9_DOCKER_WORKING_DIR}/fastdds_no_shm.xml"
 
 echo "[run.sh] SW9_ARCH         = ${SW9_ARCH}"
