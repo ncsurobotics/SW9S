@@ -7,6 +7,8 @@ use tokio::{
 };
 use tokio_serial::{DataBits, Parity, SerialStream, StopBits};
 
+use crate::comms::control_board::util::ControlBoardError;
+
 use self::response::Statuses;
 
 use super::auv_control_board::{AUVControlBoard, MessageId};
@@ -18,7 +20,7 @@ pub enum MebError {
     #[error("failed to initialized serial comms with MEB")]
     InitSerial(#[from] tokio_serial::Error),
     #[error("sending message failed")]
-    SendMessage(#[from] super::control_board::ControlBoardError),
+    SendMessage(#[from] ControlBoardError),
 }
 
 pub type Result<T, E = MebError> = core::result::Result<T, E>;

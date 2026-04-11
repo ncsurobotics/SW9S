@@ -6,7 +6,10 @@ use std::process::exit;
 use std::time::Duration;
 use sw9s_lib::{
     comms::{
-        control_board::{ControlBoard, MotorMatrix, SensorStatuses, VehicleDefinition},
+        control_board::{
+            vehicle_definition::{MotorMatrix, VehicleDefinition},
+            ControlBoard, SensorStatuses,
+        },
         meb::MainElectronicsBoard,
         zed_ros2::ZedRos2,
     },
@@ -76,6 +79,12 @@ async fn control_board() -> &'static ControlBoard<WriteHalf<SerialStream>> {
                 motor_matrix,
                 [true, true, false, false, true, false, false, true].into(),
                 [0.7071, 0.7071, 1.0, 0.4413, 1.0, 0.8139],
+                [
+                    ('X', 0.8, 0.0, 0.0, 0.6, false).into(),
+                    ('Y', 2.0, 0.0, 0.0, 0.1, false).into(),
+                    ('Z', 4.0, 0.0, 0.0, 1.0, false).into(),
+                    ('D', 1.5, 0.0, 0.0, 1.0, false).into(),
+                ],
             )
             .inspect_err(|e| logln!("Invalid vehicle definition: {:#?}", e))
             .unwrap();

@@ -91,7 +91,7 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         // Control board needs time to get its life together
         sleep(Duration::from_secs(5)).await;
 
-        this.stab_tune().await?;
+        this.stab_tune(&vehicle_defintion.pid_axes).await?;
 
         let inner_clone = this.inner.clone();
 
@@ -130,7 +130,7 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         self.motor_matrix_update().await
     }
 
-    async fn stab_tune(&self, axes: PidAxes) -> Result<()> {
+    async fn stab_tune(&self, axes: &PidAxes) -> Result<()> {
         for axis in axes {
             self.stability_assist_pid_tune(
                 axis.which,
