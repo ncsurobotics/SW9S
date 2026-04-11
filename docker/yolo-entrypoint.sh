@@ -14,7 +14,7 @@ elif [ -f /opt/ros/humble/setup.bash ]; then
     echo "[yolo-entrypoint] Sourcing ROS Humble"
     source /opt/ros/humble/setup.bash
     source /root/ros2_ws/install/setup.bash
-    source /root/ros2_ws/venv/bin/activate
+    source /opt/venv/bin/activate
 else
     echo "[yolo-entrypoint] ERROR: No supported ROS installation found!" >&2
     exit 1
