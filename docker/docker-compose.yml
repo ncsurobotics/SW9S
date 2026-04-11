@@ -51,10 +51,7 @@ services:
       - /dev:/dev
 
   yolo_ros:
-    build:
-      context: ${SW9_DOCKER_WORKING_DIR}/yolo-ros
-      dockerfile: ${YOLO_DOCKERFILE:-Dockerfile}
-    image: "yolo_ros:${SW9_ARCH:-latest}"
+    image: "ghcr.io/ncsurobotics/yolo_ros:${SW9_ARCH}"
     network_mode: "host"
     privileged: true
     runtime: nvidia
