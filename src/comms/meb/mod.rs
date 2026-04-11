@@ -1,3 +1,5 @@
+//! Implements communication protocol for the main electronics board (MEB).
+
 use std::sync::Arc;
 
 use thiserror::Error;
@@ -31,6 +33,7 @@ pub struct MainElectronicsBoard<C: AsyncWrite + Unpin> {
 }
 
 impl<C: AsyncWrite + Unpin> MainElectronicsBoard<C> {
+    /// Returns a MEB instance using the given IO backend.
     pub async fn new<T>(read_connection: T, write_connection: C) -> Self
     where
         T: 'static + AsyncReadExt + Unpin + Send,
@@ -44,6 +47,11 @@ impl<C: AsyncWrite + Unpin> MainElectronicsBoard<C> {
         }
     }
 
+    /// Returns a MEB instance using the serial backend.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if the serial port cannot be opened.
     pub async fn serial(port_name: &str) -> Result<MainElectronicsBoard<WriteHalf<SerialStream>>> {
         const BAUD_RATE: u32 = 57600;
         const DATA_BITS: DataBits = DataBits::Eight;
@@ -60,26 +68,32 @@ impl<C: AsyncWrite + Unpin> MainElectronicsBoard<C> {
 }
 
 impl<C: AsyncWrite + Unpin> MainElectronicsBoard<C> {
+    /// Returns the temperature sensor value of this [`MainElectronicsBoard<C>`].
     pub async fn temperature(&self) -> Option<f32> {
         (*self.board.responses().temp().read().await).map(f32::from_le_bytes)
     }
 
+    /// Returns the humidity sensor value of this [`MainElectronicsBoard<C>`].
     pub async fn humidity(&self) -> Option<f32> {
         (*self.board.responses().humid().read().await).map(f32::from_le_bytes)
     }
 
+    /// Returns the leak sensor value of this [`MainElectronicsBoard<C>`].
     pub async fn leak(&self) -> Option<bool> {
         *self.board.responses().leak().read().await
     }
 
+    /// Returns the thruster arm state of this [`MainElectronicsBoard<C>`].
     pub async fn thruster_arm(&self) -> Option<bool> {
         *self.board.responses().thruster_arm().read().await
     }
 
+    /// Returns the system voltage of this [`MainElectronicsBoard<C>`].
     pub async fn system_voltage(&self) -> Option<f32> {
         (*self.board.responses().system_voltage().read().await).map(f32::from_le_bytes)
     }
 
+    /// Returns the shutdown cause of this [`MainElectronicsBoard<C>`].
     pub async fn shutdown_cause(&self) -> Option<u8> {
         *self.board.responses().shutdown().read().await
     }
@@ -87,10 +101,15 @@ impl<C: AsyncWrite + Unpin> MainElectronicsBoard<C> {
 
 #[derive(Debug, Copy, Clone)]
 pub enum MebCmd {
+    /// Trigger torpedo 1
     T1Trig = 0x3,
+    /// Trigger torpedo 2
     T2Trig = 0x4,
+    /// Trigger dropper 1
     D1Trig = 0x1,
+    /// Trigger dropper 2
     D2Trig = 0x2,
+    /// Reset relevant peripheral
     Reset = 0x0,
 }
 

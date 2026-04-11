@@ -1,6 +1,9 @@
+//! Configuration for the BlueRobotics Ping360 sonar module
+
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// Sonar config submodule
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub serial_port: PathBuf,

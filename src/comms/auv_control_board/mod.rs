@@ -3,6 +3,7 @@
 //! The high-level messaging specification is implemented in the [control_board](crate::comms::control_board) module
 //!
 //! [AUVControlBoard]: https://github.com/ncsurobotics/AUVControlBoard
+
 use core::fmt::Debug;
 use std::sync::Arc;
 

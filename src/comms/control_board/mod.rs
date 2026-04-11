@@ -3,6 +3,7 @@
 //! The underlying communication protocol is implemented in the [auv_control_board](crate::comms::auv_control_board) module
 //!
 //! [AUVControlBoard]: https://github.com/ncsurobotics/AUVControlBoard
+
 use core::fmt::Debug;
 use std::{ops::Deref, sync::Arc, time::Duration};
 

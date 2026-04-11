@@ -1,3 +1,5 @@
+//! External configuration, parsable from a config file
+
 pub mod bin;
 pub mod coinflip;
 pub mod gate;
@@ -15,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
+/// Time to wait on graceful shutdown before hard shutdown
 pub const SHUTDOWN_TIMEOUT: u64 = 5;
 
 // Default values
@@ -29,23 +32,41 @@ const ZED_DEPTH_TOPIC: &str = "depth/depth_registered";
 const ZED_CLOUD_TOPIC: &str = "point_cloud/cloud_registered";
 const ZED_POSE_TOPIC: &str = "pose";
 
+/// Top-level configuration
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
+    /// The path to the control board serial port
     pub control_board_path: String,
+    /// The backup path to the control board serial port
     pub control_board_backup_path: String,
+    /// The path to the main electronics board serial port
     pub meb_path: String,
+    /// The path to the front camera video device
     pub front_cam_path: String,
+    /// The path to the bottom camera video device
     pub bottom_cam_path: String,
-    pub sonar: sonar::Config,
-    pub missions: Missions,
+    /// The active color profile used for vision. Must be in `color_profiles`
     pub color_profile: String,
+    /// The available color profiles usable for vision
     pub color_profiles: HashMap<String, ColorProfile>,
+    /// The [`Side`] the shark prop is on
     pub shark: Side,
+    /// The [`Side`] the saw fish prop is on
     pub saw_fish: Side,
+    /// BlueRobotics Ping360 sonar config submodule
+    pub sonar: sonar::Config,
+    /// Missions config submodule
+    pub missions: Missions,
+    /// ZED ROS2 subsystem config submodule
     pub zed_ros2: ZedRos2Config,
 }
 
 impl Config {
+    /// Generates a populated [`Config`] from a `config.toml` file in the current directory.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if `config.toml` does not exist.
     pub fn new() -> Result<Self> {
         let config_string = read_to_string(CONFIG_FILE)?;
         Ok(toml::from_str(&config_string)?)
@@ -53,6 +74,7 @@ impl Config {
 }
 
 impl Config {
+    /// Returns the configured [`ColorProfile`] if it exists in `color_profiles`.
     pub fn get_color_profile(&self) -> Option<&ColorProfile> {
         self.color_profiles.get(&self.color_profile)
     }
@@ -77,6 +99,7 @@ impl Default for Config {
     }
 }
 
+/// ZED ROS2 subsystem config submodule.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ZedRos2Config {
     pub namespace: String,
@@ -96,6 +119,9 @@ impl Default for ZedRos2Config {
     }
 }
 
+/// Missions config submodule.
+///
+/// Each submodule corresponds to a [mission](crate::missions).
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct Missions {
     pub gate: gate::Config,

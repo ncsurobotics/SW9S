@@ -1,5 +1,8 @@
+//! Configuration for missions that handle the coinflip task
+
 use serde::{Deserialize, Serialize};
 
+/// Coinflip mission config submodule
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub depth: f32,
