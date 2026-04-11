@@ -1,42 +1,69 @@
-FROM dustynv/ros:jazzy-ros-base-r36.4.0-cu128-24.04 AS deps
+FROM dustynv/ros:humble-desktop-l4t-r36.4.0 AS deps
+ENV ROS_DISTRO=humble
 
-ENV ROS_DISTRO=jazzy
 
-# Install build tools and ROS packages
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Refresh ROS key
+RUN rm -rfv /usr/share/keyrings/ros-archive-keyring.gpg
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+    -o /usr/share/keyrings/ros-archive-keyring.gpg
+
+RUN apt update && apt-get install -y --no-install-recommends \
     git \
     build-essential \
     python3-pip \
     python3-rosdep \
     python3-colcon-common-extensions \
-    ros-jazzy-tf2-ros \
-    ros-jazzy-tf2-geometry-msgs \
+    python3-venv \
+    ros-${ROS_DISTRO}-tf2-ros \
+    ros-${ROS_DISTRO}-tf2-geometry-msgs \
+    ros-${ROS_DISTRO}-rmw-zenoh-cpp \
+    python3-venv \
+    libopenblas-dev \
+    wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Create ros2_ws and copy source
+# --- Venv setup (persistent across all RUN steps via ENV PATH) ---
+ENV VIRTUAL_ENV=/opt/venv
+RUN python3 -m venv --system-site-packages $VIRTUAL_ENV
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+
+# Pin setuptools IMMEDIATELY before anything else can install a bad version
+RUN pip install "setuptools==68.0.0" --force-reinstall --index-url https://pypi.org/simple
+
+RUN rm -rfv /root/ros2_ws/
+RUN mkdir -p /root/ros2_ws/src
+WORKDIR /root/ros2_ws/src
+RUN git clone https://github.com/mgonzs13/yolo_ros.git
 WORKDIR /root/ros2_ws
-COPY . /root/ros2_ws/src
 
-# Initialise rosdep (ignore error if already done in base image)
-RUN rosdep init || true && rosdep update --include-eol-distros
+RUN pip install -r src/yolo_ros/requirements.txt \
+    --index-url https://pypi.jetson-ai-lab.io/jp6/cu126 \
+    --ignore-installed sympy
 
-# Install ROS package dependencies declared in package.xml files
-RUN apt-get update \
-    && rosdep install --from-paths src --ignore-src -r -y \
-    && rm -rf /var/lib/apt/lists/*
+# Re-pin after requirements.txt in case it pulled in a newer setuptools
+RUN pip install "setuptools==68.0.0" --force-reinstall --index-url https://pypi.org/simple
 
-# Install Python packages
-RUN pip3 install -r src/requirements.txt \
-    --break-system-packages \
-    --ignore-installed \
-    --no-cache-dir
+RUN rosdep init || true && rosdep update
+RUN apt update && rosdep install --from-paths src --ignore-src -r -y \
+    --skip-keys "cv_bridge"
+RUN apt-get install -y \
+    -o Dpkg::Options::="--force-overwrite" \
+    ros-${ROS_DISTRO}-cv-bridge
+
 
 FROM deps AS builder
-
 SHELL ["/bin/bash", "-c"]
 
-RUN source /opt/ros/jazzy/setup.bash && colcon build
+# Inherit the venv from deps stage
+ENV VIRTUAL_ENV=/opt/venv
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
+RUN apt-get install -y ros-${ROS_DISTRO}-rosidl-default-generators
+
+# Final pin before build — apt step above can't touch the venv's setuptools
+RUN pip install "setuptools==68.0.0" --force-reinstall --index-url https://pypi.org/simple
+
+WORKDIR /root/ros2_ws
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash && colcon build --symlink-install
 RUN echo "source /root/ros2_ws/install/setup.bash" >> ~/.bashrc
-
 CMD ["bash"]
