@@ -10,6 +10,11 @@ elif [ -f /opt/ros/kilted/setup.bash ]; then
     echo "[yolo-entrypoint] Sourcing ROS Kilted"
     source /opt/ros/kilted/setup.bash
     source /root/ros2_ws/install/setup.bash
+elif [ -f /opt/ros/humble/setup.bash ]; then
+    echo "[yolo-entrypoint] Sourcing ROS Humble"
+    source /opt/ros/humble/setup.bash
+    source /root/ros2_ws/install/setup.bash
+    source /root/ros2_ws/venv/bin/activate
 else
     echo "[yolo-entrypoint] ERROR: No supported ROS installation found!" >&2
     exit 1
