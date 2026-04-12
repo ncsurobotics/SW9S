@@ -1,41 +1,59 @@
 FROM dustynv/ros:humble-desktop-l4t-r36.4.0 AS deps
 ENV ROS_DISTRO=humble
 
-
-# Refresh ROS key
-RUN rm -rfv /usr/share/keyrings/ros-archive-keyring.gpg
-RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
+# Refresh ROS key (dustynv base sometimes has a stale one)
+RUN rm -rfv /usr/share/keyrings/ros-archive-keyring.gpg && \
+    curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key \
     -o /usr/share/keyrings/ros-archive-keyring.gpg
 
-RUN apt update && apt-get install -y --no-install-recommends \
+# System deps.
+# NOTE: ros-humble-rmw-zenoh-cpp is intentionally NOT installed here.
+#       The apt package (0.1.8) uses zenoh 0.x wire protocol, which is
+#       incompatible with the zenoh 1.x router and the depthai container
+#       (ROS Kilted, rmw_zenoh_cpp 0.6.6). We build rmw_zenoh_cpp from the
+#       Jazzy branch instead — its zenoh_cpp_vendor 0.2.9 vendors zenoh 1.6.2.
+RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     build-essential \
+    curl \
     python3-pip \
     python3-rosdep \
     python3-colcon-common-extensions \
     python3-venv \
     ros-${ROS_DISTRO}-tf2-ros \
     ros-${ROS_DISTRO}-tf2-geometry-msgs \
-    ros-${ROS_DISTRO}-rmw-zenoh-cpp \
-    python3-venv \
+    python3-venv
     libopenblas-dev \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# --- Venv setup (persistent across all RUN steps via ENV PATH) ---
+# Rust is required to compile zenoh (zenoh-c is a Rust library wrapped by zenoh_cpp_vendor)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+# ── Workspace setup ────────────────────────────────────────────────────────────
 ENV VIRTUAL_ENV=/opt/venv
 RUN python3 -m venv --system-site-packages $VIRTUAL_ENV
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 
-# Pin setuptools IMMEDIATELY before anything else can install a bad version
 RUN pip install "setuptools==68.0.0" --force-reinstall --index-url https://pypi.org/simple
 
-RUN rm -rfv /root/ros2_ws/
-RUN mkdir -p /root/ros2_ws/src
+RUN rm -rfv /root/ros2_ws/ && mkdir -p /root/ros2_ws/src
 WORKDIR /root/ros2_ws/src
+
+# yolo_ros source
 RUN git clone https://github.com/mgonzs13/yolo_ros.git
+
+# rmw_zenoh from the Jazzy branch.
+# zenoh_cpp_vendor 0.2.9 (in this branch) vendors zenoh 1.6.2 — protocol-compatible
+# with all 1.x routers and the depthai Kilted container.
+RUN git clone https://github.com/ros2/rmw_zenoh.git \
+    --branch jazzy --depth 1 --single-branch
+
 WORKDIR /root/ros2_ws
 
+# Python deps for yolo_ros (cu126 matches the Jetson's CUDA 12.6 install)
 RUN pip install -r src/yolo_ros/requirements.txt \
     --index-url https://pypi.jetson-ai-lab.io/jp6/cu126 \
     --ignore-installed sympy
@@ -43,27 +61,50 @@ RUN pip install -r src/yolo_ros/requirements.txt \
 # Re-pin after requirements.txt in case it pulled in a newer setuptools
 RUN pip install "setuptools==68.0.0" --force-reinstall --index-url https://pypi.org/simple
 
+# Install ROS deps for yolo only — rmw_zenoh deps are pulled in by the source build
 RUN rosdep init || true && rosdep update
-RUN apt update && rosdep install --from-paths src --ignore-src -r -y \
-    --skip-keys "cv_bridge"
-RUN apt-get install -y \
-    -o Dpkg::Options::="--force-overwrite" \
+RUN apt-get update && rosdep install --from-paths src/yolo_ros \
+    --ignore-src -r -y --skip-keys "cv_bridge" \
+    && rm -rf /var/lib/apt/lists/*
+RUN apt-get install -y -o Dpkg::Options::="--force-overwrite" \
     ros-${ROS_DISTRO}-cv-bridge
 
-
+# ── Build stage ────────────────────────────────────────────────────────────────
 FROM deps AS builder
 SHELL ["/bin/bash", "-c"]
 
-# Inherit the venv from deps stage
 ENV VIRTUAL_ENV=/opt/venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 RUN apt-get install -y ros-${ROS_DISTRO}-rosidl-default-generators
 
-# Final pin before build — apt step above can't touch the venv's setuptools
+# Final setuptools pin before build
 RUN pip install "setuptools==68.0.0" --force-reinstall --index-url https://pypi.org/simple
 
 WORKDIR /root/ros2_ws
-RUN source /opt/ros/${ROS_DISTRO}/setup.bash && colcon build --symlink-install
+
+# Step 1 — zenoh_cpp_vendor: downloads and compiles zenoh 1.6.2 via Cargo.
+#           This is the slowest step (~20-40 min on ARM) but is fully cached by
+#           Docker as long as the rmw_zenoh clone doesn't change.
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    colcon build --symlink-install \
+    --packages-select zenoh_cpp_vendor \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+# Step 2 — rmw_zenoh_cpp: the RMW implementation, depends on zenoh_cpp_vendor
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    source install/setup.bash && \
+    colcon build --symlink-install \
+    --packages-select rmw_zenoh_cpp \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release
+
+# Step 3 — yolo_ros and friends (fast, changes most often)
+RUN source /opt/ros/${ROS_DISTRO}/setup.bash && \
+    source install/setup.bash && \
+    colcon build --symlink-install \
+    --packages-ignore zenoh_cpp_vendor rmw_zenoh_cpp \
+    --cmake-args -DCMAKE_BUILD_TYPE=Release
+
 RUN echo "source /root/ros2_ws/install/setup.bash" >> ~/.bashrc
 CMD ["bash"]
