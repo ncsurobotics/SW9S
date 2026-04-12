@@ -10,6 +10,7 @@ RUN apt update && apt install -y --no-install-recommends \
     python3-colcon-common-extensions \
     ros-${ROS_DISTRO}-tf2-ros \
     ros-${ROS_DISTRO}-tf2-geometry-msgs \
+    ros-${ROS_DISTRO}-rmw-zenoh-cpp \
     && rm -rf /var/lib/apt/lists/*
 
 # Create ros2_ws and copy files

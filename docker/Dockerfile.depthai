@@ -1,0 +1,17 @@
+# Multi-arch base selection:
+#   linux/amd64  →  kilted-latest
+#   linux/arm64  →  kilted-arm64-latest
+#
+# Docker sets TARGETARCH automatically during `docker buildx build`.
+# Declaring both stages here lets the builder resolve the correct image
+# at build time without any external tag variable.
+
+FROM luxonis/depthai-ros:kilted-latest AS base-amd64
+FROM luxonis/depthai-ros:kilted-arm64-latest AS base-arm64
+
+ARG TARGETARCH=amd64
+FROM base-${TARGETARCH}
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ros-kilted-rmw-zenoh-cpp \
+    && rm -rf /var/lib/apt/lists/*

@@ -8,6 +8,7 @@ if [ "${MACHINE}" = "aarch64" ]; then
         echo "[run.sh] Jetson detected (L4T $(cat /etc/nv_tegra_release | head -1))"
 
         export SW9_ARCH="jetson"
+        export TARGETARCH="arm64"
         export DEPTHAI_TAG="kilted-arm64-latest"
         export YOLO_DOCKERFILE="Dockerfile.ARM"
 
@@ -23,11 +24,12 @@ if [ "${MACHINE}" = "aarch64" ]; then
 else
     echo "[run.sh] x86-64 detected"
     export SW9_ARCH="x86"
+    export TARGET_ARCH=""
     export DEPTHAI_TAG="kilted-latest"
     export YOLO_DOCKERFILE="Dockerfile"
 fi
 
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export RMW_IMPLEMENTATION=rmw_zenoh_cpp
 export FASTDDS_DEFAULT_PROFILES_FILE="${SW9_DOCKER_WORKING_DIR}/fastdds_no_shm.xml"
 
 echo "[run.sh] SW9_ARCH         = ${SW9_ARCH}"

@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-if [[$SW9_ARCH == "jetson"]]; then
+if [[ $SW9_ARCH == "jetson" ]]; then
     echo '/usr/lib/aarch64-linux-gnu/libcudss/12' > /etc/ld.so.conf.d/cudss.conf
     ldconfig
 fi
