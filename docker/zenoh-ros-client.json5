@@ -1,0 +1,36 @@
+{
+  // ROS node zenoh session config — client mode only.
+  //
+  // Fixes: "Undeclare unknown subscriber/queryable" errors from the zenoh router.
+  //
+  // Root cause: rmw_zenoh_cpp defaults to "peer" mode, which creates internal
+  // admin subscriptions (e.g. @/UUID/peer/config/**) for gossip peer-discovery.
+  // When those subscriptions are torn down, the router sees Undeclare messages
+  // for sessions it never directly tracked. Forcing "client" mode eliminates
+  // all peer-to-peer admin traffic — everything goes through the router cleanly.
+
+  mode: "client",
+
+  connect: {
+    endpoints: ["tcp/127.0.0.1:7447"],
+    retry: {
+      period_init_ms: 1000,
+      period_max_ms: 4000,
+      period_increase_factor: 2,
+    },
+  },
+
+  scouting: {
+    multicast: { enabled: false },
+    gossip:    { enabled: false },
+  },
+
+  transport: {
+    unicast: {
+      qos: { enabled: true },
+      compression: { enabled: false },
+      lowlatency: false,
+    },
+    shared_memory: { enabled: false },
+  },
+}

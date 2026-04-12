@@ -29,6 +29,7 @@ services:
       - ROS_DOMAIN_ID=0
       - RMW_IMPLEMENTATION=rmw_zenoh_cpp
       - ZENOH_ROUTER_CHECK_ATTEMPTS=5
+      - ZENOH_SESSION_CONFIG_URI=/root/ROS/zenoh-ros-client.json5
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
       - SW9_ARCH=${SW9_ARCH}
@@ -74,6 +75,7 @@ services:
       - ROS_DOMAIN_ID=0
       - RMW_IMPLEMENTATION=rmw_zenoh_cpp
       - ZENOH_ROUTER_CHECK_ATTEMPTS=5
+      - ZENOH_SESSION_CONFIG_URI=/root/ROS/zenoh-ros-client.json5
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
       - PYTHONPATH=/opt/venv/lib/python3.10/site-packages
