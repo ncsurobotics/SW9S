@@ -9,8 +9,6 @@ services:
     image: eclipse/zenoh:1.0.3  # pin to match ros-kilted-rmw-zenoh-cpp; update if version differs
     network_mode: "host"
     restart: unless-stopped
-    # -c loads the router config (larger TX queues for camera image throughput).
-    # Listens on all interfaces (incl. Tailscale) so remote clients can connect.
     command: ["-c", "/config/zenoh-router.json5", "-l", "tcp/0.0.0.0:7447"]
     ipc: host  # share /dev/shm with ROS containers so SHM descriptors can be forwarded zero-copy
     volumes:
@@ -86,6 +84,7 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
       - PYTHONPATH=/opt/venv/lib/python3.10/site-packages
       - LD_LIBRARY_PATH=/usr/local/cuda-12.6/targets/aarch64-linux/lib:/usr/lib/aarch64-linux-gnu/tegra
+      - SW9_ARCH=${SW9_ARCH}
     depends_on:
       zenoh_router:
         condition: service_started
