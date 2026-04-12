@@ -141,7 +141,7 @@ async fn zed_ros2() -> &'static ZedRos2 {
     ZED_CELL
         .get_or_init(|| async {
             let config = config().await;
-            ZedRos2::new(&config.zed_ros2).unwrap()
+            ZedRos2::new(&config.zed_ros2).await.unwrap()
         })
         .await
 }

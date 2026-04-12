@@ -24,11 +24,9 @@ const CONTROL_BOARD_BACKUP_PATH: &str = "/dev/ttyACM3";
 const MEB_PATH: &str = "/dev/ttyACM2";
 const FRONT_CAM: &str = "/dev/video0";
 const BOTTOM_CAM: &str = "/dev/video1";
-const ZED_NAMESPACE: &str = "/zed/";
-const ZED_IMAGE_TOPIC: &str = "rgb/color/rect/image";
-const ZED_DEPTH_TOPIC: &str = ZED_IMAGE_TOPIC;
-const ZED_CLOUD_TOPIC: &str = "point_cloud/cloud_registered";
-const ZED_POSE_TOPIC: &str = "pose";
+const ZED_IMAGE_TOPIC: &str = "/camera/camera/color/image_raw";
+const ZED_OBJECTS_TOPIC: &str = "/obj_det/objects";
+const ZED_POSE_TOPIC: &str = "/pose";
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
@@ -80,18 +78,34 @@ impl Default for Config {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ZedRos2Config {
-    pub namespace: String,
-    pub depth_topic: String,
-    pub cloud_topic: String,
+    /// Zenoh key suffix for the camera image topic (prefixed with `rt`).
+    #[serde(default = "ZedRos2Config::default_image_topic")]
+    pub image_topic: String,
+    /// Zenoh key suffix for the object-detection topic (prefixed with `rt`).
+    #[serde(default = "ZedRos2Config::default_objects_topic")]
+    pub objects_topic: String,
+    /// Zenoh key suffix for the pose topic (prefixed with `rt`).
+    #[serde(default = "ZedRos2Config::default_pose_topic")]
     pub pose_topic: String,
+}
+
+impl ZedRos2Config {
+    fn default_image_topic() -> String {
+        ZED_IMAGE_TOPIC.to_string()
+    }
+    fn default_objects_topic() -> String {
+        ZED_OBJECTS_TOPIC.to_string()
+    }
+    fn default_pose_topic() -> String {
+        ZED_POSE_TOPIC.to_string()
+    }
 }
 
 impl Default for ZedRos2Config {
     fn default() -> Self {
         Self {
-            namespace: ZED_NAMESPACE.to_string(),
-            depth_topic: ZED_DEPTH_TOPIC.to_string(),
-            cloud_topic: ZED_CLOUD_TOPIC.to_string(),
+            image_topic: ZED_IMAGE_TOPIC.to_string(),
+            objects_topic: ZED_OBJECTS_TOPIC.to_string(),
             pose_topic: ZED_POSE_TOPIC.to_string(),
         }
     }
