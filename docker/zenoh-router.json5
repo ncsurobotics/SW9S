@@ -1,0 +1,36 @@
+{
+  // Zenoh router config for SW9S.
+  //
+  // Fixes: "Unable to push non droppable network message — Closing transport!"
+  //
+  // Root cause: in client mode all ROS traffic (including high-bandwidth camera
+  // images) flows through this router. The default TX queue (16 batches per
+  // priority) overflows on large frames and zenoh closes the transport as a
+  // safety measure. Increasing the data queues gives the router enough headroom
+  // to absorb bursts from the depthai camera without dropping connections.
+
+  transport: {
+    unicast: {
+      queue: {
+        // Each entry is the number of 64 KB batches in that priority's TX queue.
+        // "data" covers standard ROS topics; boost data_high too for depth/color.
+        size: {
+          control:          1,
+          real_time:        1,
+          interactive_high: 4,
+          interactive_low:  4,
+          data_high:       128,
+          data:            128,
+          data_low:         64,
+          background:        1,
+        },
+      },
+      lowlatency: false,
+    },
+    // Router must also have SHM enabled so it can forward SHM descriptors to
+    // local subscribers without deserializing the payload. Remote subscribers
+    // (laptop over Tailscale) don't share SHM, so the router will transparently
+    // copy the data for those connections only.
+    shared_memory: { enabled: true },
+  },
+}

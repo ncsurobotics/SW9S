@@ -9,7 +9,12 @@ services:
     image: eclipse/zenoh:1.0.3  # pin to match ros-kilted-rmw-zenoh-cpp; update if version differs
     network_mode: "host"
     restart: unless-stopped
-    command: ["-l", "tcp/0.0.0.0:7447"]
+    # -c loads the router config (larger TX queues for camera image throughput).
+    # Listens on all interfaces (incl. Tailscale) so remote clients can connect.
+    command: ["-c", "/config/zenoh-router.json5", "-l", "tcp/0.0.0.0:7447"]
+    ipc: host  # share /dev/shm with ROS containers so SHM descriptors can be forwarded zero-copy
+    volumes:
+      - ${SW9_DOCKER_WORKING_DIR}/zenoh-router.json5:/config/zenoh-router.json5:ro
 
   depthai_node:
     image: "ghcr.io/ncsurobotics/depthai_ros:${SW9_ARCH}"
@@ -55,6 +60,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    ipc: host  # share /dev/shm with zenoh_router and yolo_ros for zero-copy SHM transport
     entrypoint: ["/bin/bash", "-c", "/root/ROS/depthai-entrypoint.sh"]
     working_dir: /root/ROS
     user: root
@@ -107,6 +113,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    ipc: host  # share /dev/shm with zenoh_router and depthai_node for zero-copy SHM transport
     entrypoint: ["/bin/bash", "-c", "/root/ROS/yolo-entrypoint.sh"]
     working_dir: /root/ROS
     user: root

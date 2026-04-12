@@ -31,6 +31,10 @@
       compression: { enabled: false },
       lowlatency: false,
     },
-    shared_memory: { enabled: false },
+    // Enabled because all ROS containers share the host IPC namespace (ipc: host
+    // in docker-compose). depthai writes image data into /dev/shm once; yolo_ros
+    // reads it directly without any copy. The router only forwards the small SHM
+    // descriptor, never the actual pixel data, so the TX queue pressure goes away.
+    shared_memory: { enabled: true },
   },
 }
