@@ -22,7 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     python3-venv \
     ros-${ROS_DISTRO}-tf2-ros \
     ros-${ROS_DISTRO}-tf2-geometry-msgs \
-    python3-venv
+    python3-venv \
     libopenblas-dev \
     wget \
     && rm -rf /var/lib/apt/lists/*
