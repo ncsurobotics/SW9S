@@ -4,6 +4,8 @@ set -e
 if [[ $SW9_ARCH == "jetson" ]]; then
     echo '/usr/lib/aarch64-linux-gnu/libcudss/12' > /etc/ld.so.conf.d/cudss.conf
     ldconfig
+else 
+    echo "SW9_ARCH is not jetson, skipping ldconfig" >&2
 fi
 
 # rest of your existing entrypoint...
