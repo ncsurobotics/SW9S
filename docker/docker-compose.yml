@@ -1,84 +1,90 @@
 # Environment Vars:
 # SW9_DOCKER_WORKING_DIR   Path to this directory
-# DEPTHAI_TAG              docker image tag for depthai image (arm or x86)
 # YOLO_DOCKERFILE          Dockerfile to build yolo_ros (arm or x86)
 # SW9_ARCH                 Arch label
 
 
-services:
-  depthai_node:
-    image: "luxonis/depthai-ros:${DEPTHAI_TAG:-kilted-latest}"
-    network_mode: "host"
-    privileged: true
-    runtime: nvidia
-    restart: unless-stopped
-    environment:
-      - ROS_DOMAIN_ID=0
-      # - FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-      - NVIDIA_VISIBLE_DEVICES=all
-      - NVIDIA_DRIVER_CAPABILITIES=all
-      - SW9_ARCH=${SW9_ARCH}
-    healthcheck:
-      test:
-        - "CMD-SHELL"
-        - |
-          /bin/bash -c "export FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml && \
-          export RMW_IMPLEMENTATION=rmw_fastrtps_cpp && \
-          source /opt/ros/kilted/setup.bash && \
-          ros2 topic echo --once /camera/camera/color/camera_info"
-      interval: 5s
-      timeout: 5s
-      retries: 2
-      start_period: 15s
-    deploy:
-      restart_policy:
-        condition: on-failure
-        delay: 2s
-        max_attempts: 10
-        window: 120s
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    entrypoint: ["/bin/bash", "-c", "/root/ROS/depthai-entrypoint.sh"]
-    working_dir: /root/ROS
-    user: root
-    volumes:
-      - ${SW9_DOCKER_WORKING_DIR}:/root/ROS
-      - /dev:/dev
+# services:
+#   zenoh_router:
+#     image: eclipse/zenoh:1.0.3  # pin to match ros-kilted-rmw-zenoh-cpp; update if version differs
+#     network_mode: "host"
+#     restart: unless-stopped
+#     command: ["-l", "tcp/0.0.0.0:7447"]
+#     ipc: host 
 
-  yolo_ros:
-    image: "ghcr.io/ncsurobotics/yolo_ros:${SW9_ARCH}"
+#   depthai_node:
+#     image: "ghcr.io/ncsurobotics/depthai_ros:${SW9_ARCH}"
+#     build:
+#       context: .
+#       dockerfile: Dockerfile.depthai
+#       args:
+#         TARGETARCH: ${TARGETARCH:-amd64}
+#     network_mode: "host"
+#     privileged: true
+#     runtime: nvidia
+#     restart: unless-stopped
+#     depends_on:
+#       zenoh_router:
+#         condition: service_started
+#     environment:
+#       - ROS_DOMAIN_ID=0
+#       - RMW_IMPLEMENTATION=rmw_zenoh_cpp
+#       - ZENOH_ROUTER_CHECK_ATTEMPTS=5
+#       - ZENOH_SESSION_CONFIG_URI=/root/ROS/zenoh-ros-client.json5
+#       - NVIDIA_VISIBLE_DEVICES=all
+#       - NVIDIA_DRIVER_CAPABILITIES=all
+#       - SW9_ARCH=${SW9_ARCH}
+#     healthcheck:
+#       test:
+#         - "CMD-SHELL"
+#         - |
+#           /bin/bash -c "source /ws/install/setup.bash && \
+#           ros2 topic echo --once /camera/camera/color/camera_info"
+#       interval: 5s
+#       timeout: 5s
+#       retries: 2
+#       start_period: 15s
+#     deploy:
+#       restart_policy:
+#         condition: on-failure
+#         delay: 2s
+#         max_attempts: 10
+#         window: 120s
+#       resources:
+#         reservations:
+#           devices:
+#             - driver: nvidia
+#               count: all
+#               capabilities: [gpu]
+#     ipc: host  # share /dev/shm with zenoh_router and yolo_ros for zero-copy SHM transport
+#     entrypoint: ["/bin/bash", "-c", "/root/ROS/depthai-entrypoint.sh"]
+#     working_dir: /root/ROS
+#     user: root
+#     volumes:
+#       - ${SW9_DOCKER_WORKING_DIR}:/root/ROS
+#       - /dev:/dev
+
+  zedx_node:
+    build:
+      context: ./
+      dockerfile: ./Dockerfile.ZED
+    image: "ghcr.io/ncsurobotics/zed:5.2-${SW9_ARCH}"
     network_mode: "host"
     privileged: true
     runtime: nvidia
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=0
-      # - FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml
-      - RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+      - RMW_IMPLEMENTATION=rmw_zenoh_cpp
+      - ZENOH_ROUTER_CHECK_ATTEMPTS=5
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
       - PYTHONPATH=/opt/venv/lib/python3.10/site-packages
       - LD_LIBRARY_PATH=/usr/local/cuda-12.6/targets/aarch64-linux/lib:/usr/lib/aarch64-linux-gnu/tegra
+      - SW9_ARCH=${SW9_ARCH}
     depends_on:
-      depthai_node:
+      zenoh_router:
         condition: service_started
-    healthcheck:
-      test:
-        - "CMD-SHELL"
-        - |
-          /bin/bash -c "export FASTDDS_DEFAULT_PROFILES_FILE=/root/ROS/fastdds_no_shm.xml && \
-          export RMW_IMPLEMENTATION=rmw_fastrtps_cpp && \
-          (source /opt/ros/jazzy/setup.bash 2>/dev/null || source /opt/ros/kilted/setup.bash || source /opt/ros/humble/setup.bash || source /opt/ros/humble/install/setup.bash) && \
-          ros2 topic echo --once /yolo/dbg_image"
-      interval: 5s
-      timeout: 5s
-      retries: 2
-      start_period: 60s
     deploy:
       restart_policy:
         condition: on-failure
@@ -91,8 +97,9 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    entrypoint: ["/bin/bash", "-c", "/root/ROS/yolo-entrypoint.sh"]
-    working_dir: /root/ROS
+    ipc: host  # share /dev/shm with zenoh_router and depthai_node for zero-copy SHM transport
+    entrypoint: ["/bin/bash", "-c", "/root/ROS/zed-entrypoint.sh"]
+    working_dir: /root/ROS/
     user: root
     volumes:
       - ${SW9_DOCKER_WORKING_DIR}:/root/ROS
