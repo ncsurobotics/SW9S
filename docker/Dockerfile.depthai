@@ -1,10 +1,6 @@
 # Multi-arch base selection:
 #   linux/amd64  →  kilted-latest
 #   linux/arm64  →  kilted-arm64-latest
-#
-# Docker sets TARGETARCH automatically during `docker buildx build`.
-# Declaring both stages here lets the builder resolve the correct image
-# at build time without any external tag variable.
 
 FROM luxonis/depthai-ros:kilted-latest AS base-amd64
 FROM luxonis/depthai-ros:kilted-arm64-latest AS base-arm64

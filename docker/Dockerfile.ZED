@@ -1,0 +1,15 @@
+FROM stereolabs/zed:5.2.3-py-runtime-l4t-r36.4
+
+RUN apt update && apt install git build-essential -y
+RUN echo '#!/bin/sh\nexec "$@"' > /usr/local/bin/sudo && chmod +x /usr/local/bin/sudo
+RUN mkdir -p /root
+WORKDIR /root
+RUN git clone https://github.com/Tiryoh/ros2_setup_scripts_ubuntu.git
+WORKDIR /root/ros2_setup_scripts_ubuntu/
+RUN chmod +x ros2-humble-desktop-main.sh
+RUN ./ros2-humble-desktop-main.sh
+
+RUN apt update && apt install ros-humble-rmw-zenoh-cpp -y
+
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+CMD ["bash"]
