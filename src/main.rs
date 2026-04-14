@@ -153,7 +153,7 @@ async fn main() {
     let (shutdown_tx, mission_ct) = shutdown_handler().await;
 
     let stream = rerun::RecordingStreamBuilder::new("SWS9")
-        .connect_grpc_opts("rerun+http://0.0.0.0:9876/proxy")
+        .serve_grpc()
         .unwrap();
 
     // Set global recording stream, ignoring previous recording (there should not be one)

@@ -112,7 +112,7 @@ impl ZedRos2 {
             MessageTypeName::new("sensor_msgs", "Image"),
             &DEFAULT_SUBSCRIPTION_QOS,
         )?;
-        let objects_name = Name::new("/", "obj_det/objects").unwrap();
+        let objects_name = Name::new("/obj_det", "objects").unwrap();
         let objects_topic = node
             .create_topic(
                 &objects_name,

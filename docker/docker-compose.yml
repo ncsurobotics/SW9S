@@ -4,13 +4,13 @@
 # SW9_ARCH                 Arch label
 
 
-# services:
-#   zenoh_router:
-#     image: eclipse/zenoh:1.0.3  # pin to match ros-kilted-rmw-zenoh-cpp; update if version differs
-#     network_mode: "host"
-#     restart: unless-stopped
-#     command: ["-l", "tcp/0.0.0.0:7447"]
-#     ipc: host 
+services:
+  # zenoh_router:
+  #   image: eclipse/zenoh:1.0.3  # pin to match ros-kilted-rmw-zenoh-cpp; update if version differs
+  #   network_mode: "host"
+  #   restart: unless-stopped
+  #   command: ["-l", "tcp/0.0.0.0:7447"]
+  #   ipc: host 
 
 #   depthai_node:
 #     image: "ghcr.io/ncsurobotics/depthai_ros:${SW9_ARCH}"
@@ -75,16 +75,16 @@
     restart: unless-stopped
     environment:
       - ROS_DOMAIN_ID=0
-      - RMW_IMPLEMENTATION=rmw_zenoh_cpp
+      # - RMW_IMPLEMENTATION=rmw_zenoh_cpp
       - ZENOH_ROUTER_CHECK_ATTEMPTS=5
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=all
       - PYTHONPATH=/opt/venv/lib/python3.10/site-packages
       - LD_LIBRARY_PATH=/usr/local/cuda-12.6/targets/aarch64-linux/lib:/usr/lib/aarch64-linux-gnu/tegra
       - SW9_ARCH=${SW9_ARCH}
-    depends_on:
-      zenoh_router:
-        condition: service_started
+    # depends_on:
+    #   zenoh_router:
+    #     condition: service_started
     deploy:
       restart_policy:
         condition: on-failure

@@ -1,0 +1,23 @@
+FROM stereolabs/zed:5.2.3-py-runtime-l4t-r36.4
+ENV ROS_DISTRO=humble
+
+RUN apt update && apt install git build-essential -y
+RUN echo '#!/bin/sh\nexec "$@"' > /usr/local/bin/sudo && chmod +x /usr/local/bin/sudo
+RUN mkdir -p /root
+WORKDIR /root
+RUN git clone https://github.com/Tiryoh/ros2_setup_scripts_ubuntu.git
+WORKDIR /root/ros2_setup_scripts_ubuntu/
+RUN chmod +x ros2-humble-desktop-main.sh
+RUN ./ros2-humble-desktop-main.sh
+
+RUN mkdir -p /root/ws/src
+WORKDIR /root/ws/src/ 
+RUN git clone https://github.com/stereolabs/zed-ros2-wrapper.git
+WORKDIR /root/ws/
+RUN apt update 
+RUN rosdep init && rosdep update
+RUN rosdep install --from-paths src --ignore-src -r -y 
+RUN colcon build --symlink-install --cmake-args=-DCMAKE_BUILD_TYPE=Release --parallel-workers $(nproc)
+
+RUN echo "source /opt/ros/humble/setup.bash && source /root/ws/install/local_setup.bash" >> ~/.bashrc
+CMD ["bash"]
