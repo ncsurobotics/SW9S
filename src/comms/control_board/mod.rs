@@ -316,6 +316,27 @@ impl<T: AsyncWrite + Unpin> ControlBoard<T> {
         self.write_out_basic(message).await
     }
 
+    pub async fn local_speed_set(
+        &self,
+        x: f32,
+        y: f32,
+        z: f32,
+        xrot: f32,
+        yrot: f32,
+        zrot: f32,
+    ) -> Result<()> {
+        const LOCAL: [u8; 5] = *b"LOCAL";
+        // Oversized to avoid reallocations
+        let mut message = Vec::with_capacity(32 * 8);
+        message.extend(LOCAL);
+
+        [x, y, z, xrot, yrot, zrot]
+            .iter()
+            .for_each(|val| message.extend(val.to_le_bytes()));
+
+        self.write_out_basic(message).await
+    }
+
     pub async fn set_initial_angle(&self) -> Result<()> {
         *self.initial_angles.lock().await = match self.responses().get_angles().await {
             Some(angle) => Some(angle),
