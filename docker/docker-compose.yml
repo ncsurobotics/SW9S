@@ -1,0 +1,121 @@
+# Environment Vars:
+# SW9_DOCKER_WORKING_DIR   Path to this directory
+# YOLO_DOCKERFILE          Dockerfile to build yolo_ros (arm or x86)
+# SW9_ARCH                 Arch label
+
+
+services:
+  # zenoh_router:
+  #   image: eclipse/zenoh:1.0.3  # pin to match ros-kilted-rmw-zenoh-cpp; update if version differs
+  #   network_mode: "host"
+  #   restart: unless-stopped
+  #   command: ["-l", "tcp/0.0.0.0:7447"]
+  #   ipc: host 
+
+#   depthai_node:
+#     image: "ghcr.io/ncsurobotics/depthai_ros:${SW9_ARCH}"
+#     build:
+#       context: .
+#       dockerfile: Dockerfile.depthai
+#       args:
+#         TARGETARCH: ${TARGETARCH:-amd64}
+#     network_mode: "host"
+#     privileged: true
+#     runtime: nvidia
+#     restart: unless-stopped
+#     depends_on:
+#       zenoh_router:
+#         condition: service_started
+#     environment:
+#       - ROS_DOMAIN_ID=0
+#       - RMW_IMPLEMENTATION=rmw_zenoh_cpp
+#       - ZENOH_ROUTER_CHECK_ATTEMPTS=5
+#       - ZENOH_SESSION_CONFIG_URI=/root/ROS/zenoh-ros-client.json5
+#       - NVIDIA_VISIBLE_DEVICES=all
+#       - NVIDIA_DRIVER_CAPABILITIES=all
+#       - SW9_ARCH=${SW9_ARCH}
+#     healthcheck:
+#       test:
+#         - "CMD-SHELL"
+#         - |
+#           /bin/bash -c "source /ws/install/setup.bash && \
+#           ros2 topic echo --once /camera/camera/color/camera_info"
+#       interval: 5s
+#       timeout: 5s
+#       retries: 2
+#       start_period: 15s
+#     deploy:
+#       restart_policy:
+#         condition: on-failure
+#         delay: 2s
+#         max_attempts: 10
+#         window: 120s
+#       resources:
+#         reservations:
+#           devices:
+#             - driver: nvidia
+#               count: all
+#               capabilities: [gpu]
+#     ipc: host  # share /dev/shm with zenoh_router and yolo_ros for zero-copy SHM transport
+#     entrypoint: ["/bin/bash", "-c", "/root/ROS/depthai-entrypoint.sh"]
+#     working_dir: /root/ROS
+#     user: root
+#     volumes:
+#       - ${SW9_DOCKER_WORKING_DIR}:/root/ROS
+#       - /dev:/dev
+
+  zedx_node:
+    build:
+      context: ./
+      dockerfile: ./Dockerfile.ZED
+    image: "ghcr.io/ncsurobotics/zed:5.2-${SW9_ARCH}"
+    network_mode: "host"
+    privileged: true
+    runtime: nvidia
+    restart: unless-stopped
+    environment:
+      - ROS_DOMAIN_ID=0
+      # - RMW_IMPLEMENTATION=rmw_zenoh_cpp
+      - ZENOH_ROUTER_CHECK_ATTEMPTS=5
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - PYTHONPATH=/opt/venv/lib/python3.10/site-packages
+      - LD_LIBRARY_PATH=/usr/local/cuda-12.6/targets/aarch64-linux/lib:/usr/lib/aarch64-linux-gnu/tegra
+      - SW9_ARCH=${SW9_ARCH}
+    # depends_on:
+    #   zenoh_router:
+    #     condition: service_started
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 0
+        window: 120s
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ipc: host  # share /dev/shm with zenoh_router and depthai_node for zero-copy SHM transport
+    entrypoint: ["/bin/bash", "-c", "/root/ROS/zed-entrypoint.sh"]
+    working_dir: /root/ROS/
+    user: root
+    volumes:
+      - ${SW9_DOCKER_WORKING_DIR}:/root/ROS
+      - /dev:/dev
+      - /usr/bin/tegrastats:/usr/bin/tegrastats
+      - /tmp/argus_socket:/tmp/argus_socket
+      - /usr/local/cuda-12.6/targets/aarch64-linux/lib/libcusolver.so.11:/usr/local/cuda-12.6/targets/aarch64-linux/lib/libcusolver.so.11
+      - /usr/local/cuda-12.6/targets/aarch64-linux/lib/libcusparse.so.11:/usr/local/cuda-12.6/targets/aarch64-linux/lib/libcusparse.so.11
+      - /usr/local/cuda-12.6/targets/aarch64-linux/lib/libcurand.so.10:/usr/local/cuda-12.6/targets/aarch64-linux/lib/libcurand.so.10
+      - /usr/local/cuda-12.6/targets/aarch64-linux/lib/libnvToolsExt.so:/usr/local/cuda-12.6/targets/aarch64-linux/lib/libnvToolsExt.so
+      - /usr/local/cuda-12.6/targets/aarch64-linux/lib/libcupti.so.11.4:/usr/local/cuda-12.6/targets/aarch64-linux/lib/libcupti.so.11.4
+      - /usr/local/cuda-12.6/targets/aarch64-linux/include:/usr/local/cuda-12.6/targets/aarch64-linux/include
+      - /usr/local/cuda-12.6:/usr/local/cuda-12.6
+      - /usr/lib/aarch64-linux-gnu/libcudss/12:/usr/lib/aarch64-linux-gnu/libcudss/12
+      - /usr/lib/aarch64-linux-gnu/tegra:/usr/lib/aarch64-linux-gnu/tegra
+      - /usr/src/jetson_multimedia_api:/usr/src/jetson_multimedia_api
+      - /opt/nvidia/nsight-systems-cli:/opt/nvidia/nsight-systems-cli
+      - /opt/nvidia/vpi2:/opt/nvidia/vpi2
+      - /usr/share/vpi2:/usr/share/vpi2

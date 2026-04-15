@@ -25,7 +25,8 @@ const MEB_PATH: &str = "/dev/ttyACM2";
 const FRONT_CAM: &str = "/dev/video0";
 const BOTTOM_CAM: &str = "/dev/video1";
 const ZED_NAMESPACE: &str = "/zed/";
-const ZED_DEPTH_TOPIC: &str = "depth/depth_registered";
+const ZED_IMAGE_TOPIC: &str = "rgb/color/rect/image";
+const ZED_DEPTH_TOPIC: &str = ZED_IMAGE_TOPIC;
 const ZED_CLOUD_TOPIC: &str = "point_cloud/cloud_registered";
 const ZED_POSE_TOPIC: &str = "pose";
 
