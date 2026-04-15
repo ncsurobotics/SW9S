@@ -4,7 +4,7 @@ use std::env::temp_dir;
 use std::env;
 use std::process::exit;
 use std::time::Duration;
-use sw8s_rust_lib::{
+use sw9s_lib::{
     comms::{
         control_board::{ControlBoard, SensorStatuses},
         meb::MainElectronicsBoard,

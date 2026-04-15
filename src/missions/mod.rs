@@ -8,7 +8,6 @@ pub mod example;
 pub mod extra;
 pub mod fire_torpedo;
 pub mod gate;
-pub mod graph;
 pub mod meb;
 pub mod movement;
 pub mod octagon;

@@ -68,7 +68,7 @@ impl Slalom<OnnxModel> {
     }
 
     pub fn load_640(threshold: f64) -> Self {
-        let model = load_onnx!("models/2025Slalom.onnx", 640, 2);
+        let model = load_onnx!("models/dummy_model.onnx", 640, 2);
 
         Self { model, threshold }
     }

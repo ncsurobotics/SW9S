@@ -37,13 +37,14 @@
             cargo-watch
             cargo-expand
             cargo-info
+            cargo-machete
             rust-analyzer
             bacon
           ];
         in {
           default =
             (pkgs.buildFHSEnv {
-              name = "sw8s-rust-fhs";
+              name = "sw9s-fhs";
               targetPkgs = pkgs:
                 with pkgs.llvmPackages_19;
                   [

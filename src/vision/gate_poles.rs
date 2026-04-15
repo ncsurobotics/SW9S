@@ -91,7 +91,7 @@ impl GatePoles<OnnxModel> {
     }
 
     pub fn load_640(threshold: f64) -> Self {
-        let model = load_onnx!("models/new_gate.onnx", 640, 6);
+        let model = load_onnx!("models/dummy_model.onnx", 640, 6);
 
         Self { model, threshold }
     }
