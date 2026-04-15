@@ -127,7 +127,7 @@ impl ZedRos2 {
                 )
             })?;
         let pose_topic = node.create_topic(
-            &Name::new("/", "pose").unwrap(),
+            &Name::new("/zed/zed_node/", "pose").unwrap(),
             MessageTypeName::new("geometry_msgs", "PoseStamped"),
             &DEFAULT_SUBSCRIPTION_QOS,
         )?;

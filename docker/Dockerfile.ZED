@@ -3,21 +3,33 @@ ENV ROS_DISTRO=humble
 
 RUN apt update && apt install git build-essential -y
 RUN echo '#!/bin/sh\nexec "$@"' > /usr/local/bin/sudo && chmod +x /usr/local/bin/sudo
-RUN mkdir -p /root
+
 WORKDIR /root
 RUN git clone https://github.com/Tiryoh/ros2_setup_scripts_ubuntu.git
+
 WORKDIR /root/ros2_setup_scripts_ubuntu/
-RUN chmod +x ros2-humble-desktop-main.sh
-RUN ./ros2-humble-desktop-main.sh
+RUN chmod +x ros2-humble-desktop-main.sh && ./ros2-humble-desktop-main.sh
 
 RUN mkdir -p /root/ws/src
-WORKDIR /root/ws/src/ 
+WORKDIR /root/ws/src/
 RUN git clone https://github.com/stereolabs/zed-ros2-wrapper.git
+
 WORKDIR /root/ws/
-RUN apt update 
-RUN rosdep init && rosdep update
-RUN rosdep install --from-paths src --ignore-src -r -y 
-RUN colcon build --symlink-install --cmake-args=-DCMAKE_BUILD_TYPE=Release --parallel-workers $(nproc)
+RUN apt update
+
+RUN bash -c "source /opt/ros/humble/setup.bash && rosdep update && rosdep install --from-paths src --ignore-src -r -y"
+
+RUN ln -sf /usr/local/cuda/lib64/stubs/libcuda.so \
+           /usr/local/cuda/lib64/stubs/libcuda.so.1
+
+RUN bash -c "source /opt/ros/humble/setup.bash && \
+    colcon build \
+      --symlink-install \
+      --cmake-args \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_EXE_LINKER_FLAGS='-L/usr/local/cuda/lib64/stubs -L/usr/lib/aarch64-linux-gnu/nvidia -Wl,--allow-shlib-undefined' \
+        -DCMAKE_SHARED_LINKER_FLAGS='-L/usr/local/cuda/lib64/stubs -L/usr/lib/aarch64-linux-gnu/nvidia -Wl,--allow-shlib-undefined' \
+      --parallel-workers $(nproc)"
 
 RUN echo "source /opt/ros/humble/setup.bash && source /root/ws/install/local_setup.bash" >> ~/.bashrc
 CMD ["bash"]
