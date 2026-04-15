@@ -1,0 +1,14 @@
+Error getting config file: Os {
+    code: 2,
+    kind: NotFound,
+    message: "No such file or directory",
+}
+Using default config
+Buffer does not begin with start byte, discarding [65, 40, 65, 164, 114, 254]
+Message len < 4: [193]
+Buffer does not begin with start byte, discarding [82, 77, 1]
+Capture string: v4l2src device=/dev/video0 ! image/jpeg, width=640, height=480, framerate=30/1 ! jpegdec ! tee name=raw raw. ! queue  ! videoconvert ! videobalance brightness=0.0 ! appsink raw. ! queue  ! videoconvert ! omxh264enc bitrate=2048000 control-rate=variable ! video/x-h264,profile=baseline ! tee name=h264 h264. ! queue ! h264parse config_interval=-1 ! video/x-h264,stream-format=byte-stream,alignment=au ! rtspclientsink location=rtsp://127.0.0.1:8554/front.mp4 h264. ! queue ! mpegtsmux ! filesink location="/tmp/cams_2026-04-13_20:42:47/front.mp4" 
+Capture string: v4l2src device=/dev/video1 ! image/jpeg, width=640, height=480, framerate=30/1 ! jpegdec ! tee name=raw raw. ! queue  ! videoconvert ! videobalance brightness=0.0 ! appsink raw. ! queue  ! videoconvert ! omxh264enc bitrate=2048000 control-rate=variable ! video/x-h264,profile=baseline ! tee name=h264 h264. ! queue ! h264parse config_interval=-1 ! video/x-h264,stream-format=byte-stream,alignment=au ! rtspclientsink location=rtsp://127.0.0.1:8554/bottom.mp4 h264. ! queue ! mpegtsmux ! filesink location="/tmp/cams_2026-04-13_20:42:47/bottom.mp4" 
+CTRL-C RECV
+imu not ready
+Missions did not exit within 5 seconds

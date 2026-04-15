@@ -6,6 +6,7 @@ use std::{
 };
 
 use chrono::Local;
+use rerun::RecordingStream;
 
 pub static TIMESTAMP: LazyLock<String> =
     LazyLock::new(|| Local::now().format("%Y-%m-%d_%H:%M:%S").to_string());
@@ -14,6 +15,11 @@ pub static LOGFILE: LazyLock<Mutex<File>> = LazyLock::new(|| {
     let _ = create_dir("console");
     Mutex::new(File::create(&("console/".to_string() + &TIMESTAMP + ".txt")).unwrap())
 });
+
+/// Get the global RecordingStream for rerun.
+pub fn get_recording() -> RecordingStream {
+    RecordingStream::global(rerun::StoreKind::Recording).expect("Rerun is not initialized")
+}
 
 #[macro_export]
 macro_rules! logln {

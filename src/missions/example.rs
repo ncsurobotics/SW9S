@@ -1,4 +1,4 @@
-use tokio::io::WriteHalf;
+use tokio::{io::WriteHalf, select};
 use tokio_serial::SerialStream;
 
 use crate::{act_nest, missions::action_context::GetZedRos2};
@@ -15,6 +15,7 @@ use super::{
     meb::WaitArm,
     movement::{Descend, Stability2Movement, Stability2Pos},
 };
+use tokio_util::sync::CancellationToken;
 
 /// Example function for Action system
 ///
@@ -141,10 +142,17 @@ pub async fn zed_test<
     loop {
         if let Some(pose) = zed.latest_pose().await {
             #[cfg(feature = "logging")]
-            logln!("Pose data received: x {} y {} z {}", pose.pose.position.x, pose.pose.position.y, pose.pose.position.z);
+            logln!(
+                "Pose data received: x {} y {} z {}",
+                pose.pose.position.x,
+                pose.pose.position.y,
+                pose.pose.position.z
+            );
         } else {
             #[cfg(feature = "logging")]
             logln!("No pose data received");
         }
+        let mut delay = DelayAction::new(0.5);
+        delay.execute().await;
     }
 }

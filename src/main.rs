@@ -27,7 +27,6 @@ use sw9s_lib::{
         meb::WaitArm,
         octagon::octagon,
         path_align::{path_align_procedural, static_align_procedural},
-        reset_torpedo::ResetTorpedo,
         slalom::slalom,
         sonar::sonar,
         spin::spin,
@@ -183,6 +182,13 @@ async fn main() {
     color_eyre::install().unwrap();
     let (shutdown_tx, mission_ct) = shutdown_handler().await;
 
+    let stream = rerun::RecordingStreamBuilder::new("SWS9")
+        .serve_grpc()
+        .unwrap();
+
+    // Set global recording stream, ignoring previous recording (there should not be one)
+    let _ = rerun::RecordingStream::set_global(rerun::StoreKind::Recording, Some(stream));
+
     let orig_hook = std::panic::take_hook();
     let mission_ct_clone = mission_ct.clone();
     std::panic::set_hook(Box::new(move |panic_info| {
@@ -246,6 +252,7 @@ async fn shutdown_handler() -> (UnboundedSender<i32>, CancellationToken) {
                 x
             }
         };
+        println!("Exit Status: {exit_status}");
 
         let status = control_board().await.sensor_status_query().await;
 
@@ -268,7 +275,7 @@ async fn shutdown_handler() -> (UnboundedSender<i32>, CancellationToken) {
         };
 
         // Reset Torpedo
-        ResetTorpedo::new(static_context().await).execute().await;
+        // ResetTorpedo::new(static_context().await).execute().await;
 
         // If shutdown is unexpected, cancel running missions and exit nonzero
         if exit_status != 0 {
@@ -284,6 +291,7 @@ async fn shutdown_handler() -> (UnboundedSender<i32>, CancellationToken) {
             {
                 logln!("Missions did not exit within {SHUTDOWN_TIMEOUT} seconds")
             }
+            println!("EXITING PROCESS");
             exit(exit_status)
         };
     });
@@ -300,6 +308,7 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
     }
 
     let config = config().await;
+    println!("Running {mission}");
     let res = match mission.to_lowercase().as_str() {
         "arm" => ctwrap!(WaitArm::new(static_context().await).execute()),
         "empty" => {
