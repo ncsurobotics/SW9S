@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 use anyhow::Result;
 use futures::StreamExt;
 use serde::{Deserialize, Serialize};
