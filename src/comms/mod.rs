@@ -3,6 +3,8 @@ pub mod control_board;
 #[cfg(feature = "meb")]
 pub mod meb;
 #[cfg(feature = "ros")]
+pub mod zed_messages;
+#[cfg(feature = "ros")]
 pub mod zed_ros2;
 
 #[macro_export]

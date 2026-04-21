@@ -1,13 +1,12 @@
+<<<<<<< Updated upstream
 use anyhow::Result;
 use futures::StreamExt;
-use ros2_client::{
-    Context, MessageTypeName, Name, NodeName, NodeOptions, DEFAULT_SUBSCRIPTION_QOS,
-};
-use ros2_interfaces_jazzy_serde::{geometry_msgs::msg::PoseStamped, sensor_msgs::msg::Image};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use zenoh::Session;
 
+use super::zed_messages::{Image, PointCloud2, PoseStamped};
 use crate::config::ZedRos2Config;
 
 pub mod zed_interfaces {
@@ -93,101 +92,31 @@ pub struct ZedRos2 {
     image: Arc<Mutex<Option<Image>>>,
     objects: Arc<Mutex<Option<ObjectsStamped>>>,
     pose: Arc<Mutex<Option<PoseStamped>>>,
-    _context: Context,
-    _node: Arc<ros2_client::Node>,
+    /// Keeps the Zenoh session alive for the lifetime of this handle.
+    _session: Arc<Session>,
 }
 
 impl ZedRos2 {
-    pub fn new(config: &ZedRos2Config) -> Result<Self> {
-        let context = Context::new()?;
-        let mut node =
-            context.new_node(NodeName::new("/", "sw8s_zed_client")?, NodeOptions::new())?;
+    pub async fn new(config: &ZedRos2Config) -> Result<Self> {
+        let session = Arc::new(zenoh::open(zenoh::Config::default()).await?);
 
-        let image = Arc::new(Mutex::new(None));
-        let objects = Arc::new(Mutex::new(None));
-        let pose = Arc::new(Mutex::new(None));
+        let depth = Arc::new(Mutex::new(None::<Image>));
+        let cloud = Arc::new(Mutex::new(None::<PointCloud2>));
+        let pose = Arc::new(Mutex::new(None::<PoseStamped>));
 
-        let image_topic = node.create_topic(
-            &Name::new("/", "image").unwrap(),
-            MessageTypeName::new("sensor_msgs", "Image"),
-            &DEFAULT_SUBSCRIPTION_QOS,
-        )?;
-        let objects_name = Name::new("/obj_det", "objects").unwrap();
-        let objects_topic = node
-            .create_topic(
-                &objects_name,
-                MessageTypeName::new("zed_interfaces", "ObjectsStamped"),
-                &DEFAULT_SUBSCRIPTION_QOS,
-            )
-            .or_else(|_| {
-                node.create_topic(
-                    &objects_name,
-                    MessageTypeName::new("zed_msgs", "ObjectsStamped"),
-                    &DEFAULT_SUBSCRIPTION_QOS,
-                )
-            })?;
-        let pose_topic = node.create_topic(
-            &Name::new("/zed/zed_node/", "pose").unwrap(),
-            MessageTypeName::new("geometry_msgs", "PoseStamped"),
-            &DEFAULT_SUBSCRIPTION_QOS,
-        )?;
+        let depth_ke = zenoh_key(&config.namespace, &config.depth_topic);
+        let cloud_ke = zenoh_key(&config.namespace, &config.cloud_topic);
+        let pose_ke = zenoh_key(&config.namespace, &config.pose_topic);
 
-        let image_sub = node.create_subscription::<Image>(&image_topic, None)?;
-        let objects_sub = node.create_subscription::<ObjectsStamped>(&objects_topic, None)?;
-        let pose_sub = node.create_subscription::<PoseStamped>(&pose_topic, None)?;
-
-        let spinner = node.spinner()?;
-        tokio::spawn(async move {
-            let _ = spinner.spin().await;
-        });
-
-        let image_cache = image.clone();
-        tokio::spawn(async move {
-            let mut stream = Box::pin(image_sub.async_stream());
-            while let Some(result) = stream.next().await {
-                if let Ok((msg, _)) = result {
-                    if let Some(img) = rerun_image_from_ros_image(&msg) {
-                        let rec = crate::get_recording();
-                        let _ = rec.log("zed_ros2/image", &img);
-                    }
-
-                    *image_cache.lock().await = Some(msg);
-                }
-            }
-        });
-
-        let objects_cache = objects.clone();
-        tokio::spawn(async move {
-            let mut stream = Box::pin(objects_sub.async_stream());
-            while let Some(result) = stream.next().await {
-                if let Ok((msg, _)) = result {
-                    let rec = crate::get_recording();
-                    log_objects_to_rerun(&rec, &msg);
-
-                    *objects_cache.lock().await = Some(msg);
-                }
-            }
-        });
-
-        let pose_cache = pose.clone();
-        tokio::spawn(async move {
-            let mut stream = Box::pin(pose_sub.async_stream());
-            while let Some(result) = stream.next().await {
-                if let Ok((msg, _)) = result {
-                    let rec = crate::get_recording();
-                    log_pose_to_rerun(&rec, &msg);
-
-                    *pose_cache.lock().await = Some(msg);
-                }
-            }
-        });
+        spawn_subscriber::<Image>(&session, depth_ke, depth.clone()).await?;
+        spawn_subscriber::<PointCloud2>(&session, cloud_ke, cloud.clone()).await?;
+        spawn_subscriber::<PoseStamped>(&session, pose_ke, pose.clone()).await?;
 
         Ok(Self {
             image,
             objects,
             pose,
-            _context: context,
-            _node: Arc::new(node),
+            _session: session,
         })
     }
 
@@ -204,14 +133,58 @@ impl ZedRos2 {
     }
 }
 
-fn topic_name(namespace: &str, topic: &str) -> Result<Name> {
-    println!("{namespace} ---- {topic}");
-    if topic.starts_with('/') {
-        let trimmed = topic.trim_start_matches('/');
-        Name::new("/", trimmed).map_err(Into::into)
+/// Declares a Zenoh subscriber for `key_expr` and spawns a background task
+/// that decodes each CDR sample into `T` and stores it in `cache`.
+async fn spawn_subscriber<T>(
+    session: &Session,
+    key_expr: String,
+    cache: Arc<Mutex<Option<T>>>,
+) -> Result<()>
+where
+    T: serde::de::DeserializeOwned + Send + 'static,
+{
+    let sub = session.declare_subscriber(key_expr.as_str()).await?;
+    tokio::spawn(async move {
+        while let Ok(sample) = sub.recv_async().await {
+            let raw = sample.payload().to_bytes();
+            match decode_cdr::<T>(raw.as_ref()) {
+                Ok(msg) => *cache.lock().await = Some(msg),
+                Err(e) => eprintln!(
+                    "[zed_ros2] CDR decode error on {}: {e}",
+                    sample.key_expr()
+                ),
+            }
+        }
+    });
+    Ok(())
+}
+
+/// Builds a Zenoh key expression from a ROS2-style namespace + topic.
+///
+/// Both the zenoh-ros2dds bridge and oxidros-zenoh follow the convention of
+/// stripping the leading `/` and prefixing with `rt/` ("ROS2 topic"):
+///   `/zed/zed_node/pose`              → `rt/zed/zed_node/pose`
+///   namespace `/zed/zed_node` + `depth/depth_registered`
+///                                      → `rt/zed/zed_node/depth/depth_registered`
+fn zenoh_key(namespace: &str, topic: &str) -> String {
+    let full = if topic.starts_with('/') {
+        topic.to_string()
     } else {
-        Name::new(namespace, topic).map_err(Into::into)
+        format!("{}/{}", namespace.trim_end_matches('/'), topic)
+    };
+    format!("rt/{}", full.trim_start_matches('/'))
+}
+
+/// Decodes a CDR-encoded ROS2 message.
+///
+/// ROS2 prepends a 4-byte RTPS encapsulation header before the CDR payload:
+///   `[0x00, 0x01, 0x00, 0x00]`  (little-endian CDR — standard on ARM/x86)
+/// The `cdr` crate handles the remaining bytes as standard CDR-LE.
+fn decode_cdr<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T> {
+    if bytes.len() < 4 {
+        bail!("CDR payload too short ({} bytes)", bytes.len());
     }
+    cdr::deserialize::<T>(&bytes[4..]).map_err(|e| anyhow::anyhow!("CDR: {e}"))
 }
 
 fn rerun_image_from_ros_image(msg: &Image) -> Option<rerun::Image> {
