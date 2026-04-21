@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use color_eyre::eyre::{anyhow, Result};
 use opencv::{
     prelude::Mat,
     videoio::{VideoCapture, VideoCaptureAPIs, VideoCaptureTrait},

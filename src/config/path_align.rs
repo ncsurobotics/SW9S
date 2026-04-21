@@ -1,5 +1,8 @@
+//! Configuration for the path align mission
+
 use serde::{Deserialize, Serialize};
 
+/// Path align mission config submodule
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub depth: f32,

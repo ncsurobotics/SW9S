@@ -11,7 +11,7 @@ use crate::vision::{
     Angle2D, Draw, DrawRect2d, Offset2D, RelPos, RelPosAngle, VisualDetection, VisualDetector,
 };
 
-use anyhow::{anyhow, Result};
+use color_eyre::eyre::{anyhow, Result};
 use num_traits::{Float, FromPrimitive, Num};
 use opencv::core::{Mat, Rect2d};
 use uuid::Uuid;
@@ -783,9 +783,9 @@ impl<
 }
 
 impl<T: Display, U: Send + Sync + Clone, V: Send + Sync + Clone>
-    ActionMod<anyhow::Result<Vec<VisualDetection<U, V>>>> for DetectTarget<T, U, V>
+    ActionMod<Result<Vec<VisualDetection<U, V>>>> for DetectTarget<T, U, V>
 {
-    fn modify(&mut self, input: &anyhow::Result<Vec<VisualDetection<U, V>>>) {
+    fn modify(&mut self, input: &Result<Vec<VisualDetection<U, V>>>) {
         #[allow(clippy::all)]
         {
             self.results = input.as_ref().map(|valid| valid.clone()).ok()
@@ -846,8 +846,8 @@ impl<T: Send + Sync + Clone> ActionMod<Option<Vec<T>>> for Average<T> {
     }
 }
 
-impl<T: Send + Sync + Clone> ActionMod<anyhow::Result<Vec<T>>> for Average<T> {
-    fn modify(&mut self, input: &anyhow::Result<Vec<T>>) {
+impl<T: Send + Sync + Clone> ActionMod<Result<Vec<T>>> for Average<T> {
+    fn modify(&mut self, input: &Result<Vec<T>>) {
         if let Ok(input) = input {
             self.values.clone_from(input);
         } else {
@@ -991,8 +991,8 @@ impl<T: Send + Sync + Clone> ActionMod<Option<Vec<T>>> for MidPoint<T> {
     }
 }
 
-impl<T: Send + Sync + Clone> ActionMod<anyhow::Result<Vec<T>>> for MidPoint<T> {
-    fn modify(&mut self, input: &anyhow::Result<Vec<T>>) {
+impl<T: Send + Sync + Clone> ActionMod<Result<Vec<T>>> for MidPoint<T> {
+    fn modify(&mut self, input: &Result<Vec<T>>) {
         if let Ok(input) = input {
             self.values.clone_from(input);
         } else {

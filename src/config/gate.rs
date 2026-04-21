@@ -1,6 +1,9 @@
+//! Configuration for the gate family of missions
+
 use super::Side;
 use serde::{Deserialize, Serialize};
 
+/// Gate mission config submodule
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub depth: f32,

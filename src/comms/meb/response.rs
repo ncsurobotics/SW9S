@@ -1,3 +1,5 @@
+//! Response parsing and handling
+
 use std::sync::{
     mpsc::{channel, Sender, TryRecvError},
     Arc,
@@ -64,7 +66,6 @@ impl Statuses {
         let shutdown: Lock<_> = Arc::default();
         let ack_map: Arc<Mutex<KeyedAcknowledges>> = Arc::default();
         let (_tx, rx) = channel::<()>(); // Signals struct destruction to thread
-                                         //
         let temp_clone = temp.clone();
         let humid_clone = humid.clone();
         let leak_clone = leak.clone();

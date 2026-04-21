@@ -1,4 +1,8 @@
-use anyhow::Result;
+//! Implements communication with our external vision stack
+//!
+//! ROS2 and Stereolabs ZED cameras
+
+use color_eyre::eyre::Result;
 use futures::StreamExt;
 use ros2_client::{
     Context, MessageTypeName, Name, NodeName, NodeOptions, DEFAULT_SUBSCRIPTION_QOS,

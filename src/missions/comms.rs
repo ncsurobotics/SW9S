@@ -1,4 +1,4 @@
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use tokio::io::WriteHalf;
 use tokio_serial::SerialStream;
 
@@ -22,9 +22,10 @@ impl<T> Action for StartBno055<'_, T> {}
 
 impl<T: GetControlBoard<WriteHalf<SerialStream>>> ActionExec<Result<()>> for StartBno055<'_, T> {
     async fn execute(&mut self) -> Result<()> {
-        self.context
+        Ok(self
+            .context
             .get_control_board()
             .bno055_periodic_read(true)
-            .await
+            .await?)
     }
 }

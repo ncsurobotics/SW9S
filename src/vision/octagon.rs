@@ -1,4 +1,5 @@
 use super::{image_prep::resize, MatWrapper, Offset2D, VisualDetection, VisualDetector};
+use color_eyre::eyre::Result;
 use opencv::{
     core::{in_range, Point, Size, VecN, Vector},
     imgproc::{find_contours, CHAIN_APPROX_SIMPLE, RETR_TREE},
@@ -90,7 +91,7 @@ impl VisualDetector<f64> for Octagon {
     fn detect(
         &mut self,
         input_image: &Mat,
-    ) -> anyhow::Result<Vec<VisualDetection<Self::ClassEnum, Self::Position>>> {
+    ) -> Result<Vec<VisualDetection<Self::ClassEnum, Self::Position>>> {
         let image = resize(input_image, &self.size)?;
         self.image.0 = image.clone();
 
