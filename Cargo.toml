@@ -44,7 +44,8 @@ chrono = "0.4.38" # Handling times
 bluerobotics-ping = "0.3.5"
 serde_json = "1.0.140"
 tokio-util = { version = "0.7.15" }
-zenoh = "1.9.0"
+oxidros = { version = "0.5", features = ["zenoh"] }
+ros2-types = "0.5"
 cdr = "0.2.4"
 rerun = { version = "0.31.3", default-features = false, features = ["sdk", "server", "ecolor"] }
 nalgebra = "0.34.2"
