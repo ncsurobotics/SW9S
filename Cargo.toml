@@ -48,6 +48,7 @@ zenoh = "1.9.0"
 cdr = "0.2.4"
 rerun = { version = "0.31.3", default-features = false, features = ["sdk", "server", "ecolor"] }
 nalgebra = "0.34.2"
+ros2-interfaces-jazzy-serde = { version = "*", features = ["std_msgs", "sensor_msgs"] }  # replace with the latest version and features you need
 
 [build-dependencies]
 quote = { version = "1.0.36", optional = true }

@@ -4,9 +4,9 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 use zenoh::Session;
+use ros2_interfaces_jazzy_serde::std_msgs;
 
-use super::zed_messages::{Image, PointCloud2, PoseStamped};
-use crate::config::ZedRos2Config;
+use super::zed_messages::{Image, PoseStamped};
 
 pub mod zed_interfaces {
     use super::*;
@@ -77,11 +77,9 @@ pub mod zed_interfaces {
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     pub struct ObjectsStamped {
-        pub header: ros2_interfaces_jazzy_serde::std_msgs::msg::Header,
+        pub header: std_msgs::msg::Header,
         pub objects: Vec<Object>,
     }
-
-    impl ros2_client::Message for ObjectsStamped {}
 }
 
 use zed_interfaces::ObjectsStamped;
@@ -91,25 +89,20 @@ pub struct ZedRos2 {
     image: Arc<Mutex<Option<Image>>>,
     objects: Arc<Mutex<Option<ObjectsStamped>>>,
     pose: Arc<Mutex<Option<PoseStamped>>>,
-    /// Keeps the Zenoh session alive for the lifetime of this handle.
     _session: Arc<Session>,
 }
 
 impl ZedRos2 {
-    pub async fn new(config: &ZedRos2Config) -> Result<Self> {
-        let session = Arc::new(zenoh::open(zenoh::Config::default()).await?);
+    pub async fn new() -> Result<Self> {
+        let session = Arc::new(zenoh::open(zenoh::Config::default()).await.unwrap());
 
-        let depth = Arc::new(Mutex::new(None::<Image>));
-        let cloud = Arc::new(Mutex::new(None::<PointCloud2>));
+        let image = Arc::new(Mutex::new(None::<Image>));
+        let objects = Arc::new(Mutex::new(None::<ObjectsStamped>));
         let pose = Arc::new(Mutex::new(None::<PoseStamped>));
 
-        let depth_ke = zenoh_key(&config.namespace, &config.depth_topic);
-        let cloud_ke = zenoh_key(&config.namespace, &config.cloud_topic);
-        let pose_ke = zenoh_key(&config.namespace, &config.pose_topic);
-
-        spawn_subscriber::<Image>(&session, depth_ke, depth.clone()).await?;
-        spawn_subscriber::<PointCloud2>(&session, cloud_ke, cloud.clone()).await?;
-        spawn_subscriber::<PoseStamped>(&session, pose_ke, pose.clone()).await?;
+        spawn_subscriber::<Image>(&session, "rt/zed/zed_node/rgb/image_rect_color".to_string(), image.clone()).await?;
+        spawn_subscriber::<ObjectsStamped>(&session, "rt/zed/zed_node/obj_det/objects".to_string(), objects.clone()).await?;
+        spawn_subscriber::<PoseStamped>(&session, "rt/zed/zed_node/pose".to_string(), pose.clone()).await?;
 
         Ok(Self {
             image,
@@ -132,8 +125,6 @@ impl ZedRos2 {
     }
 }
 
-/// Declares a Zenoh subscriber for `key_expr` and spawns a background task
-/// that decodes each CDR sample into `T` and stores it in `cache`.
 async fn spawn_subscriber<T>(
     session: &Session,
     key_expr: String,
@@ -142,7 +133,7 @@ async fn spawn_subscriber<T>(
 where
     T: serde::de::DeserializeOwned + Send + 'static,
 {
-    let sub = session.declare_subscriber(key_expr.as_str()).await?;
+    let sub = session.declare_subscriber(key_expr.as_str()).await.unwrap();
     tokio::spawn(async move {
         while let Ok(sample) = sub.recv_async().await {
             let raw = sample.payload().to_bytes();
@@ -181,7 +172,7 @@ fn zenoh_key(namespace: &str, topic: &str) -> String {
 /// The `cdr` crate handles the remaining bytes as standard CDR-LE.
 fn decode_cdr<T: serde::de::DeserializeOwned>(bytes: &[u8]) -> Result<T> {
     if bytes.len() < 4 {
-        bail!("CDR payload too short ({} bytes)", bytes.len());
+        panic!("CDR payload too short ({} bytes)", bytes.len());
     }
     cdr::deserialize::<T>(&bytes[4..]).map_err(|e| anyhow::anyhow!("CDR: {e}"))
 }
