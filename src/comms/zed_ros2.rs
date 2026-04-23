@@ -1,17 +1,13 @@
-use anyhow::Result;
-use futures::StreamExt;
-use ros2_client::{
-    Context, MessageTypeName, Name, NodeName, NodeOptions, DEFAULT_SUBSCRIPTION_QOS,
-};
-use ros2_interfaces_jazzy_serde::{geometry_msgs::msg::PoseStamped, sensor_msgs::msg::Image};
-use serde::{Deserialize, Serialize};
+use anyhow::{Context, Result};
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use crate::config::ZedRos2Config;
+use ros2_interfaces_jazzy_serde::geometry_msgs::msg::PoseStamped;
+use ros2_interfaces_jazzy_serde::sensor_msgs::msg::{Image, Imu};
 
 pub mod zed_interfaces {
-    use super::*;
+    use ros2_interfaces_jazzy_serde::std_msgs::msg::Header;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     pub struct Keypoint2Di {
@@ -79,124 +75,90 @@ pub mod zed_interfaces {
 
     #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
     pub struct ObjectsStamped {
-        pub header: ros2_interfaces_jazzy_serde::std_msgs::msg::Header,
+        pub header: Header,
         pub objects: Vec<Object>,
     }
-
-    impl ros2_client::Message for ObjectsStamped {}
 }
 
-use zed_interfaces::ObjectsStamped;
+const DOMAIN_ID: u32 = 0;
+
+fn cdr_deserialize<T: for<'de> serde::Deserialize<'de>>(bytes: &[u8]) -> Result<T> {
+    let payload = if bytes.len() >= 4 { &bytes[4..] } else { bytes };
+    cdr::deserialize(payload).context("CDR deserialization failed")
+}
+
+fn read_payload(sample: &zenoh::sample::Sample) -> Vec<u8> {
+    sample.payload().to_bytes().into_owned()
+}
+
+fn ros_key(domain_id: u32, topic: &str) -> String {
+    let stripped = topic.trim_start_matches('/');
+    format!("{domain_id}/{stripped}/**")
+}
+
+fn insert_json5(config: &mut zenoh::Config, key: &str, value: &str) -> Result<()> {
+    config
+        .insert_json5(key, value)
+        .map_err(|e| anyhow::anyhow!("zenoh config key '{}': {}", key, e))
+}
+
+async fn build_session() -> Result<Arc<zenoh::Session>> {
+    let mut config = zenoh::Config::default();
+
+    insert_json5(&mut config, "connect/endpoints", r#"["tcp/localhost:7447"]"#)?;
+    insert_json5(&mut config, "transport/shared_memory/enabled", "true")?;
+
+    zenoh::open(config)
+        .await
+        .map(Arc::new)
+        .map_err(|e| anyhow::anyhow!("zenoh open failed: {e}"))
+}
 
 #[derive(Clone)]
 pub struct ZedRos2 {
     image: Arc<Mutex<Option<Image>>>,
-    objects: Arc<Mutex<Option<ObjectsStamped>>>,
+    depth: Arc<Mutex<Option<Image>>>,
+    imu: Arc<Mutex<Option<Imu>>>,
     pose: Arc<Mutex<Option<PoseStamped>>>,
-    _context: Context,
-    _node: Arc<ros2_client::Node>,
 }
 
 impl ZedRos2 {
-    pub fn new(config: &ZedRos2Config) -> Result<Self> {
-        let context = Context::new()?;
-        let mut node =
-            context.new_node(NodeName::new("/", "sw8s_zed_client")?, NodeOptions::new())?;
+    pub async fn new() -> Result<Self> {
+        let session = build_session().await?;
 
-        let image = Arc::new(Mutex::new(None));
-        let objects = Arc::new(Mutex::new(None));
-        let pose = Arc::new(Mutex::new(None));
+        let image = Arc::new(Mutex::new(None::<Image>));
+        let depth = Arc::new(Mutex::new(None::<Image>));
+        let imu = Arc::new(Mutex::new(None::<Imu>));
+        let pose = Arc::new(Mutex::new(None::<PoseStamped>));
 
-        let image_topic = node.create_topic(
-            &Name::new("/", "image").unwrap(),
-            MessageTypeName::new("sensor_msgs", "Image"),
-            &DEFAULT_SUBSCRIPTION_QOS,
-        )?;
-        let objects_name = Name::new("/obj_det", "objects").unwrap();
-        let objects_topic = node
-            .create_topic(
-                &objects_name,
-                MessageTypeName::new("zed_interfaces", "ObjectsStamped"),
-                &DEFAULT_SUBSCRIPTION_QOS,
-            )
-            .or_else(|_| {
-                node.create_topic(
-                    &objects_name,
-                    MessageTypeName::new("zed_msgs", "ObjectsStamped"),
-                    &DEFAULT_SUBSCRIPTION_QOS,
-                )
-            })?;
-        let pose_topic = node.create_topic(
-            &Name::new("/", "pose").unwrap(),
-            MessageTypeName::new("geometry_msgs", "PoseStamped"),
-            &DEFAULT_SUBSCRIPTION_QOS,
-        )?;
+        spawn_subscriber::<Image>(
+            &session,
+            "/zed/zed_node/rgb/image_rect_color",
+            image.clone(),
+        )
+        .await?;
+        spawn_subscriber::<Image>(
+            &session,
+            "/zed/zed_node/depth/depth_registered",
+            depth.clone(),
+        )
+        .await?;
+        spawn_subscriber::<Imu>(&session, "/zed/zed_node/imu/data", imu.clone()).await?;
+        spawn_subscriber::<PoseStamped>(&session, "/zed/zed_node/pose", pose.clone()).await?;
 
-        let image_sub = node.create_subscription::<Image>(&image_topic, None)?;
-        let objects_sub = node.create_subscription::<ObjectsStamped>(&objects_topic, None)?;
-        let pose_sub = node.create_subscription::<PoseStamped>(&pose_topic, None)?;
-
-        let spinner = node.spinner()?;
-        tokio::spawn(async move {
-            let _ = spinner.spin().await;
-        });
-
-        let image_cache = image.clone();
-        tokio::spawn(async move {
-            let mut stream = Box::pin(image_sub.async_stream());
-            while let Some(result) = stream.next().await {
-                if let Ok((msg, _)) = result {
-                    if let Some(img) = rerun_image_from_ros_image(&msg) {
-                        let rec = crate::get_recording();
-                        let _ = rec.log("zed_ros2/image", &img);
-                    }
-
-                    *image_cache.lock().await = Some(msg);
-                }
-            }
-        });
-
-        let objects_cache = objects.clone();
-        tokio::spawn(async move {
-            let mut stream = Box::pin(objects_sub.async_stream());
-            while let Some(result) = stream.next().await {
-                if let Ok((msg, _)) = result {
-                    let rec = crate::get_recording();
-                    log_objects_to_rerun(&rec, &msg);
-
-                    *objects_cache.lock().await = Some(msg);
-                }
-            }
-        });
-
-        let pose_cache = pose.clone();
-        tokio::spawn(async move {
-            let mut stream = Box::pin(pose_sub.async_stream());
-            while let Some(result) = stream.next().await {
-                if let Ok((msg, _)) = result {
-                    let rec = crate::get_recording();
-                    log_pose_to_rerun(&rec, &msg);
-
-                    *pose_cache.lock().await = Some(msg);
-                }
-            }
-        });
-
-        Ok(Self {
-            image,
-            objects,
-            pose,
-            _context: context,
-            _node: Arc::new(node),
-        })
+        Ok(Self { image, depth, imu, pose })
     }
 
     pub async fn latest_image(&self) -> Option<Image> {
         self.image.lock().await.clone()
     }
 
-    pub async fn latest_objects(&self) -> Option<ObjectsStamped> {
-        self.objects.lock().await.clone()
+    pub async fn latest_depth(&self) -> Option<Image> {
+        self.depth.lock().await.clone()
+    }
+
+    pub async fn latest_imu(&self) -> Option<Imu> {
+        self.imu.lock().await.clone()
     }
 
     pub async fn latest_pose(&self) -> Option<PoseStamped> {
@@ -204,14 +166,42 @@ impl ZedRos2 {
     }
 }
 
-fn topic_name(namespace: &str, topic: &str) -> Result<Name> {
-    println!("{namespace} ---- {topic}");
-    if topic.starts_with('/') {
-        let trimmed = topic.trim_start_matches('/');
-        Name::new("/", trimmed).map_err(Into::into)
-    } else {
-        Name::new(namespace, topic).map_err(Into::into)
-    }
+async fn spawn_subscriber<T>(
+    session: &Arc<zenoh::Session>,
+    topic: &str,
+    cache: Arc<Mutex<Option<T>>>,
+) -> Result<()>
+where
+    T: for<'de> serde::Deserialize<'de> + Clone + Send + 'static,
+{
+    let key = ros_key(DOMAIN_ID, topic);
+    let topic_str = topic.to_string();
+
+    let subscriber = session
+        .declare_subscriber(&key)
+        .await
+        .map_err(|e| anyhow::anyhow!("failed to subscribe to {key}: {e}"))?;
+
+    tokio::spawn(async move {
+        let _sub = subscriber;
+        loop {
+            match _sub.recv_async().await {
+                Ok(sample) => {
+                    let bytes = read_payload(&sample);
+                    match cdr_deserialize::<T>(&bytes) {
+                        Ok(msg) => *cache.lock().await = Some(msg),
+                        Err(e) => eprintln!("[zed_ros2] CDR decode error on {topic_str}: {e}"),
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[zed_ros2] subscriber closed on {topic_str}: {e}");
+                    break;
+                }
+            }
+        }
+    });
+
+    Ok(())
 }
 
 fn rerun_image_from_ros_image(msg: &Image) -> Option<rerun::Image> {
@@ -260,73 +250,6 @@ fn rerun_image_from_ros_image(msg: &Image) -> Option<rerun::Image> {
         color_model,
         rerun::ChannelDatatype::U8,
     ))
-}
-
-fn log_objects_to_rerun(rec: &rerun::RecordingStream, msg: &ObjectsStamped) {
-    if msg.objects.is_empty() {
-        let _ = rec.log("zed_ros2/image/objects", &rerun::Boxes2D::clear_fields());
-        let _ = rec.log("zed_ros2/objects/log", &rerun::TextLog::new("0 detections"));
-        return;
-    }
-
-    let mut mins = Vec::new();
-    let mut sizes = Vec::new();
-    let mut labels = Vec::new();
-
-    for object in &msg.objects {
-        let points = &object.bounding_box_2d.corners;
-
-        let min_x = points
-            .iter()
-            .map(|point| point.kp[0] as f32)
-            .fold(f32::INFINITY, f32::min);
-        let min_y = points
-            .iter()
-            .map(|point| point.kp[1] as f32)
-            .fold(f32::INFINITY, f32::min);
-        let max_x = points
-            .iter()
-            .map(|point| point.kp[0] as f32)
-            .fold(f32::NEG_INFINITY, f32::max);
-        let max_y = points
-            .iter()
-            .map(|point| point.kp[1] as f32)
-            .fold(f32::NEG_INFINITY, f32::max);
-
-        let size_x = (max_x - min_x).max(0.0);
-        let size_y = (max_y - min_y).max(0.0);
-
-        if !min_x.is_finite()
-            || !min_y.is_finite()
-            || !size_x.is_finite()
-            || !size_y.is_finite()
-            || size_x == 0.0
-            || size_y == 0.0
-        {
-            continue;
-        }
-
-        mins.push((min_x, min_y));
-        sizes.push((size_x, size_y));
-        labels.push(if object.label.is_empty() {
-            format!("id {}", object.label_id)
-        } else {
-            format!("{} ({:.0}%)", object.label, object.confidence)
-        });
-    }
-
-    if mins.is_empty() {
-        let _ = rec.log("zed_ros2/image/objects", &rerun::Boxes2D::clear_fields());
-        let _ = rec.log("zed_ros2/objects/log", &rerun::TextLog::new("0 detections"));
-    } else {
-        let detection_count = labels.len();
-        let boxes = rerun::Boxes2D::from_mins_and_sizes(mins, sizes).with_labels(labels);
-        let _ = rec.log("zed_ros2/image/objects", &boxes);
-        let _ = rec.log(
-            "zed_ros2/objects/log",
-            &rerun::TextLog::new(format!("{detection_count} detections")),
-        );
-    }
 }
 
 fn log_pose_to_rerun(rec: &rerun::RecordingStream, msg: &PoseStamped) {

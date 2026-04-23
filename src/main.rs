@@ -139,10 +139,7 @@ async fn static_context() -> &'static FullActionContext<'static, WriteHalf<Seria
 static ZED_CELL: OnceCell<ZedRos2> = OnceCell::const_new();
 async fn zed_ros2() -> &'static ZedRos2 {
     ZED_CELL
-        .get_or_init(|| async {
-            let config = config().await;
-            ZedRos2::new(&config.zed_ros2).unwrap()
-        })
+        .get_or_init(|| async { ZedRos2::new().await.unwrap() })
         .await
 }
 

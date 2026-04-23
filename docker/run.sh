@@ -36,4 +36,4 @@ echo "[run.sh] YOLO_DOCKERFILE  = ${YOLO_DOCKERFILE}"
 echo "[run.sh] RMW              = ${RMW_IMPLEMENTATION}"
 
 cd "${SW9_DOCKER_WORKING_DIR}"
-docker compose up
+docker compose up --remove-orphans
