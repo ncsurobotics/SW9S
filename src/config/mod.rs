@@ -76,17 +76,18 @@ impl Default for Config {
     }
 }
 
+// ROS2 topics consumed over Zenoh and Zenoh config
 #[derive(Debug, Serialize, Deserialize)]
 pub struct ZedRos2Config {
-    /// Zenoh key suffix for the camera image topic (prefixed with `rt`).
     #[serde(default = "ZedRos2Config::default_image_topic")]
     pub image_topic: String,
-    /// Zenoh key suffix for the object-detection topic (prefixed with `rt`).
     #[serde(default = "ZedRos2Config::default_objects_topic")]
     pub objects_topic: String,
-    /// Zenoh key suffix for the pose topic (prefixed with `rt`).
     #[serde(default = "ZedRos2Config::default_pose_topic")]
     pub pose_topic: String,
+    // Defaults to local router at tcp/localhost:7447 if not set
+    #[serde(default)]
+    pub zenoh_config: Option<String>,
 }
 
 impl ZedRos2Config {
@@ -107,6 +108,7 @@ impl Default for ZedRos2Config {
             image_topic: ZED_IMAGE_TOPIC.to_string(),
             objects_topic: ZED_OBJECTS_TOPIC.to_string(),
             pose_topic: ZED_POSE_TOPIC.to_string(),
+            zenoh_config: None,
         }
     }
 }

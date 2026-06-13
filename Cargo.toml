@@ -56,8 +56,7 @@ nonzero = "0.2.0"
 bluerobotics-ping = "0.3.5"
 serde_json = "1.0.140"
 tokio-util = { version = "0.7.15" }
-oxidros-zenoh = "0.5.7"
-oxidros-msg = "0.5.8"
+zenoh = { version = "1.9.0", default-features = false, features = ["transport_tcp", "transport_udp"] }
 cdr = "0.2"
 rerun = { version = "0.29.2", default-features = false, features = ["sdk", "server", "ecolor"] }
 

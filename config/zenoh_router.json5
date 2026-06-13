@@ -1,0 +1,13 @@
+// Router config for the local network, acting as the discovery hub for all nodes.
+{
+  mode: "router",
+  listen: {
+    endpoints: ["tcp/0.0.0.0:7447"],
+  },
+  scouting: {
+    // Lets local peers find the router without configuring its address.
+    multicast: {
+      enabled: true,
+    },
+  },
+}

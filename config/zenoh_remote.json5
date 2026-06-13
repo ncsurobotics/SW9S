@@ -1,0 +1,8 @@
+// Client config for reaching the robot's Zenoh router (rmw_zenoh) over Tailscale.
+{
+  mode: "client",
+  connect: {
+    // Replace with the Tailscale IP of the machine running the Zenoh router.
+    endpoints: ["tcp/100.100.100.1:7447"],
+  },
+}
