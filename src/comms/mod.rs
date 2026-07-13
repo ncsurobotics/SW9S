@@ -1,3 +1,5 @@
+//! Communications implementations for various subsystems
+
 pub mod auv_control_board;
 pub mod control_board;
 #[cfg(feature = "meb")]

@@ -11,7 +11,7 @@ use opencv::{
     prelude::{Mat, MatSizeTraitConst, MatTrait, MatTraitConst, MatTraitConstManual},
 };
 
-use anyhow::Result;
+use color_eyre::eyre::Result;
 
 /// Creates a new Mat with the specified size
 ///

@@ -1,5 +1,7 @@
+//! Helper utilities for communicating with the control board
+//!
 // Implementing <https://mb3hel.github.io/AUVControlBoard/user_guide/comm_protocol/>
-use std::{error::Error, fmt::Display};
+use thiserror::Error;
 
 pub const START_BYTE: u8 = 253;
 pub const END_BYTE: u8 = 254;
@@ -38,22 +40,19 @@ pub fn crc_itt16_false(bytes: &[u8]) -> u16 {
     crc
 }
 
-#[derive(Debug)]
+#[derive(Error, Debug)]
 pub enum AcknowledgeErr {
+    #[error("unknown message")]
     UnknownMsg,
+    #[error("invalid arguments")]
     InvalidArguments,
+    #[error("invalid command")]
     InvalidCommand,
+    #[error("reserved")]
     Reserved,
+    #[error("undefined: '{0}'")]
     Undefined(u8),
 }
-
-impl Display for AcknowledgeErr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{self:?}")
-    }
-}
-
-impl Error for AcknowledgeErr {}
 
 impl From<u8> for AcknowledgeErr {
     fn from(value: u8) -> Self {

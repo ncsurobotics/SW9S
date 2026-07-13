@@ -1,6 +1,7 @@
 use crate::config::ColorProfile;
 
 use super::{image_prep::resize, MatWrapper, PosVector, VisualDetection, VisualDetector, Yuv};
+use color_eyre::eyre::Result;
 use opencv::{
     core::{in_range, Point, Scalar, Size, Vector},
     imgproc::{
@@ -71,7 +72,7 @@ impl VisualDetector<f64> for Slalom {
     fn detect(
         &mut self,
         input_image: &Mat,
-    ) -> anyhow::Result<Vec<VisualDetection<Self::ClassEnum, Self::Position>>> {
+    ) -> Result<Vec<VisualDetection<Self::ClassEnum, Self::Position>>> {
         let areas = self.area_bounds.clone();
         let min_area = areas.start();
         let max_area = areas.end();

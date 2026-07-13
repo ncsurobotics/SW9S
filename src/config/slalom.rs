@@ -1,8 +1,11 @@
+//! Configuration for the slalom family of missions
+
 use std::ops::RangeInclusive;
 
 use super::Side;
 use serde::{Deserialize, Serialize};
 
+/// Slalom mission config submodule
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     pub depth: f32,

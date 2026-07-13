@@ -1,3 +1,4 @@
+//! Response parsing
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 
@@ -194,7 +195,7 @@ mod tests {
             )
             .collect::<Vec<Vec<u8>>>()
             .await,
-            vec![vec![]]
+            Vec::<Vec<u8>>::new()
         );
 
         assert_eq!(
