@@ -8,37 +8,36 @@ use super::{
         Action, ActionChain, ActionConcurrent, ActionConditional, ActionExec, ActionSequence,
         RaceAction,
     },
-    action_context::{FrontCamIO, GetControlBoard, GetMainElectronicsBoard},
+    action_context::{FrontCamIO, GetControlBoard},
     basic::DelayAction,
     comms::StartBno055,
     extra::{AlwaysTrue, OutputType, UnwrapAction},
-    meb::WaitArm,
     movement::{Descend, Stability2Movement, Stability2Pos},
 };
 use tokio_util::sync::CancellationToken;
 
 /// Example function for Action system
 ///
-/// Runs two nested actions in order: Waiting for arm and descending in
-/// parallel, followed by waiting for arm and descending concurrently.
+/// Runs two nested actions in order: delaying and descending in
+/// parallel, followed by a delay.
 pub fn initial_descent<
     'a,
-    Con: Send + Sync + GetMainElectronicsBoard + GetControlBoard<WriteHalf<SerialStream>>,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>>,
     T: Send + Sync + 'a,
 >(
     context: &'a Con,
 ) -> impl ActionExec<T> + 'a
 where
-    WaitArm<'a, Con>: ActionExec<T>,
+    DelayAction: ActionExec<T>,
 {
     ActionSequence::new(
-        ActionConcurrent::new(WaitArm::new(context), Descend::new(context, -0.5)),
-        WaitArm::new(context), //ActionConcurrent::new(WaitArm::new(context), Descend::new(context, -1.0)),
+        ActionConcurrent::new(DelayAction::new(1.0), Descend::new(context, -0.5)),
+        DelayAction::new(1.0),
     )
 }
 
 pub fn pid_test<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + FrontCamIO,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + FrontCamIO,
 >(
     context: &Con,
 ) -> impl ActionExec<()> + '_ {
@@ -73,39 +72,34 @@ pub fn pid_test<
 
 /// Example function for Action system
 ///
-/// Runs two nested actions in order: Waiting for arm and descending in
-/// parallel, followed by waiting for arm and descending concurrently.
+/// Runs a conditional: delaying if true, descending otherwise.
 pub fn always_wait<T: Send + Sync>(context: &T) -> impl Action + '_ {
     ActionConditional::new(
         AlwaysTrue::new(),
-        WaitArm::new(context),
+        DelayAction::new(1.0),
         Descend::new(context, -0.5),
     )
 }
 
-pub fn sequence_conditional<
-    Con: Send + Sync + GetMainElectronicsBoard + GetControlBoard<WriteHalf<SerialStream>>,
->(
+pub fn sequence_conditional<Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>>>(
     context: &Con,
 ) -> impl ActionExec<()> + '_ {
     ActionSequence::new(
-        ActionSequence::new(WaitArm::new(context), Descend::new(context, -1.0)),
+        ActionSequence::new(DelayAction::new(1.0), Descend::new(context, -1.0)),
         ActionConditional::new(
             AlwaysTrue::new(),
-            WaitArm::new(context),
+            DelayAction::new(1.0),
             UnwrapAction::new(Descend::new(context, -0.5)),
         ),
     )
 }
 
-pub fn race_conditional<
-    Con: Send + Sync + GetMainElectronicsBoard + GetControlBoard<WriteHalf<SerialStream>>,
->(
+pub fn race_conditional<Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>>>(
     context: &Con,
 ) -> impl ActionExec<()> + '_ {
     ActionConditional::new(
         AlwaysTrue::new(),
-        WaitArm::new(context),
+        DelayAction::new(1.0),
         RaceAction::new(
             UnwrapAction::new(Descend::new(context, -0.5)),
             DelayAction::new(1.0),
@@ -114,9 +108,7 @@ pub fn race_conditional<
 }
 
 /// Function to demonstrate use of act_nest
-pub fn race_many<
-    Con: Send + Sync + GetMainElectronicsBoard + GetControlBoard<WriteHalf<SerialStream>>,
->(
+pub fn race_many<Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>>>(
     _context: &Con,
 ) -> impl ActionExec<bool> + '_ {
     ActionSequence::<bool, _, _>::new(
@@ -133,7 +125,7 @@ pub fn race_many<
 }
 
 pub async fn zed_test<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + GetZedRos2,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetZedRos2,
 >(
     context: &Con,
 ) {

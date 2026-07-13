@@ -1,10 +1,10 @@
 use tokio::io::WriteHalf;
 use tokio_serial::SerialStream;
 
-use super::action_context::{BottomCamIO, GetControlBoard, GetMainElectronicsBoard};
+use super::action_context::{BottomCamIO, GetControlBoard};
 
 pub async fn bin<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + BottomCamIO,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + BottomCamIO,
 >(
     context: &Con,
 ) {

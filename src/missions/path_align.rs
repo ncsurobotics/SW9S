@@ -8,11 +8,11 @@ use crate::{missions::vision::VisionNormBottomAngle, vision::path_cv::PathCV};
 
 use super::{
     action::ActionExec,
-    action_context::{BottomCamIO, GetControlBoard, GetMainElectronicsBoard},
+    action_context::{BottomCamIO, GetControlBoard},
 };
 
 pub async fn path_align_procedural<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + BottomCamIO,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + BottomCamIO,
 >(
     context: &Con,
     config: &Config,
@@ -127,7 +127,7 @@ pub async fn path_align_procedural<
 }
 
 pub async fn static_align_procedural<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + BottomCamIO,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + BottomCamIO,
 >(
     context: &Con,
     config: &Config,

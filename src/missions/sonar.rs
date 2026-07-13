@@ -14,11 +14,11 @@ use tokio::{io::WriteHalf, select};
 use tokio_serial::{SerialPort, SerialPortBuilderExt, SerialStream};
 use tokio_util::sync::CancellationToken;
 
-use super::action_context::{GetControlBoard, GetMainElectronicsBoard};
+use super::action_context::GetControlBoard;
 use crate::config::sonar::Config;
 
 pub async fn sonar<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>>,
 >(
     context: &Con,
     cfg: &Config,

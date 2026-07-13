@@ -2,9 +2,8 @@ use crate::logln;
 
 use super::{
     action::{Action, ActionChain, ActionExec, ActionSequence},
-    action_context::{GetControlBoard, GetMainElectronicsBoard},
+    action_context::GetControlBoard,
     extra::OutputType,
-    meb::WaitArm,
     movement::{Descend, Stability2Movement, Stability2Pos, StraightMovement, ZeroMovement},
 };
 
@@ -42,7 +41,7 @@ impl DelayAction {
  **/
 pub fn descend_and_go_forward<
     'a,
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>>,
     T: Send + Sync,
 >(
     context: &'a Con,
@@ -56,26 +55,23 @@ where
     let dive_duration = 2.0;
     let forward_duration = 0.0;
     ActionSequence::new(
-        WaitArm::new(context),
+        ActionSequence::new(
+            Descend::new(context, depth),
+            DelayAction::new(dive_duration),
+        ),
         ActionSequence::new(
             ActionSequence::new(
-                Descend::new(context, depth),
-                DelayAction::new(dive_duration),
+                StraightMovement::new(context, depth, true),
+                DelayAction::new(forward_duration),
             ),
-            ActionSequence::new(
-                ActionSequence::new(
-                    StraightMovement::new(context, depth, true),
-                    DelayAction::new(forward_duration),
-                ),
-                ZeroMovement::new(context, depth),
-            ),
+            ZeroMovement::new(context, depth),
         ),
     )
 }
 
 pub fn descend_depth_and_go_forward<
     'a,
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>>,
     T: Send + Sync,
 >(
     context: &'a Con,
@@ -88,25 +84,22 @@ where
     let dive_duration = 4.0;
     let forward_duration = 2.0;
     ActionSequence::new(
-        WaitArm::new(context),
+        ActionSequence::new(
+            ActionChain::new(
+                Stability2Movement::new(
+                    context,
+                    Stability2Pos::new(0.0, 0.0, 0.0, 0.0, None, depth),
+                ),
+                OutputType::<()>::new(),
+            ),
+            DelayAction::new(dive_duration),
+        ),
         ActionSequence::new(
             ActionSequence::new(
-                ActionChain::new(
-                    Stability2Movement::new(
-                        context,
-                        Stability2Pos::new(0.0, 0.0, 0.0, 0.0, None, depth),
-                    ),
-                    OutputType::<()>::new(),
-                ),
-                DelayAction::new(dive_duration),
+                StraightMovement::new(context, depth, true),
+                DelayAction::new(forward_duration),
             ),
-            ActionSequence::new(
-                ActionSequence::new(
-                    StraightMovement::new(context, depth, true),
-                    DelayAction::new(forward_duration),
-                ),
-                ZeroMovement::new(context, depth),
-            ),
+            ZeroMovement::new(context, depth),
         ),
     )
 }

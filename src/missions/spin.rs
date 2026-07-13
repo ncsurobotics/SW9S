@@ -1,11 +1,11 @@
-use super::action_context::{BottomCamIO, GetControlBoard, GetMainElectronicsBoard};
+use super::action_context::{BottomCamIO, GetControlBoard};
 use crate::config::spin::Config;
 use tokio::io::WriteHalf;
 use tokio::time::{sleep, Duration};
 use tokio_serial::SerialStream;
 
 pub async fn spin<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + BottomCamIO,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + BottomCamIO,
 >(
     context: &Con,
     config: &Config,

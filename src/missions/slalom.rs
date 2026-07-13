@@ -4,7 +4,7 @@ use tokio::{
 };
 use tokio_serial::SerialStream;
 
-use super::action_context::{FrontCamIO, GetControlBoard, GetMainElectronicsBoard};
+use super::action_context::{FrontCamIO, GetControlBoard};
 use crate::{
     config::{slalom::Config, ColorProfile, Side::*},
     missions::{action::ActionExec, vision::VisionNormAngle},
@@ -12,7 +12,7 @@ use crate::{
 
 // TODO: Consider filtering detections by angle (poles will always be upright)
 pub async fn slalom<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + FrontCamIO,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + FrontCamIO,
 >(
     context: &Con,
     config: &Config,

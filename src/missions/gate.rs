@@ -14,13 +14,13 @@ use crate::{
 
 use super::{
     action::ActionExec,
-    action_context::{FrontCamIO, GetControlBoard, GetMainElectronicsBoard},
+    action_context::{FrontCamIO, GetControlBoard},
     basic::DelayAction,
     vision::VisionNorm,
 };
 
 pub async fn gate_run_dead_reckon<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + FrontCamIO,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + FrontCamIO,
 >(
     context: &Con,
     config: &Config,
@@ -76,7 +76,7 @@ pub async fn gate_run_dead_reckon<
 }
 
 pub async fn gate_run_cv_procedural<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + FrontCamIO,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + FrontCamIO,
 >(
     context: &Con,
     config: &Config,
@@ -283,7 +283,7 @@ pub async fn gate_run_cv_procedural<
 }
 
 pub async fn gate_run_procedural<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + FrontCamIO,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + FrontCamIO,
 >(
     context: &Con,
     config: &Config,

@@ -1,6 +1,5 @@
 control_board_path = "/dev/ttyACM0"
 control_board_backup_path = "/dev/ttyACM4"
-meb_path = "/dev/ttyACM2"
 front_cam_path = "/dev/video0"
 bottom_cam_path = "/dev/video1"
 color_profile = "Night Testing"

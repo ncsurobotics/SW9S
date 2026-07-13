@@ -10,7 +10,6 @@ use sw9s_lib::{
             vehicle_definition::{MotorMatrix, VehicleDefinition},
             ControlBoard, SensorStatuses,
         },
-        meb::MainElectronicsBoard,
         zed_ros2::ZedRos2,
     },
     config::{Config, SHUTDOWN_TIMEOUT},
@@ -22,9 +21,7 @@ use sw9s_lib::{
         bin::bin,
         coinflip::coinflip_procedural,
         example::{initial_descent, pid_test, zed_test},
-        fire_torpedo::{FireLeftTorpedo, FireRightTorpedo},
         gate::{gate_run_cv_procedural, gate_run_dead_reckon, gate_run_procedural},
-        meb::WaitArm,
         octagon::octagon,
         path_align::{path_align_procedural, static_align_procedural},
         slalom::slalom,
@@ -77,7 +74,8 @@ async fn control_board() -> &'static ControlBoard<WriteHalf<SerialStream>> {
             let vehicle_def = VehicleDefinition::new(
                 motor_matrix,
                 [true, true, false, false, true, false, false, true].into(),
-                [0.7071, 0.7071, 1.0, 0.4413, 1.0, 0.8139],
+                // [0.7071, 0.7071, 1.0, 0.4413, 1.0, 0.8139],
+                [0.7071, 0.7071, 1.0, 0.302, 1.0, 0.446],
                 [
                     ('X', 0.8, 0.0, 0.0, 0.6, false).into(),
                     ('Y', 2.0, 0.0, 0.0, 0.1, false).into(),
@@ -105,19 +103,6 @@ async fn control_board() -> &'static ControlBoard<WriteHalf<SerialStream>> {
                         .unwrap()
                 }
             }
-        })
-        .await
-}
-
-static MEB_CELL: OnceCell<MainElectronicsBoard<WriteHalf<SerialStream>>> = OnceCell::const_new();
-async fn meb() -> &'static MainElectronicsBoard<WriteHalf<SerialStream>> {
-    MEB_CELL
-        .get_or_init(|| async {
-            MainElectronicsBoard::<WriteHalf<SerialStream>>::serial(
-                config().await.meb_path.as_str(),
-            )
-            .await
-            .unwrap()
         })
         .await
 }
@@ -156,7 +141,6 @@ async fn static_context() -> &'static FullActionContext<'static, WriteHalf<Seria
         .get_or_init(|| async {
             FullActionContext::new(
                 control_board().await,
-                meb().await,
                 front_cam().await,
                 bottom_cam().await,
                 zed_ros2().await,
@@ -209,23 +193,6 @@ async fn main() {
         exit(1);
     }));
 
-    let shutdown_tx_clone = shutdown_tx.clone();
-    tokio::spawn(async move {
-        let meb = meb().await;
-
-        // Wait for arm condition
-        while meb.thruster_arm().await != Some(true) {
-            sleep(Duration::from_secs(1)).await;
-        }
-
-        // Wait for disarm condition
-        while meb.thruster_arm().await != Some(false) {
-            sleep(Duration::from_secs(1)).await;
-        }
-
-        shutdown_tx_clone.send(1).unwrap();
-    });
-
     for arg in env::args().skip(1).collect::<Vec<String>>() {
         let _guard = SHUTDOWN_GUARD.acquire().await.unwrap();
         run_mission(&arg, mission_ct.clone()).await.unwrap();
@@ -274,9 +241,6 @@ async fn shutdown_handler() -> (UnboundedSender<i32>, CancellationToken) {
                 .unwrap();
         };
 
-        // Reset Torpedo
-        // ResetTorpedo::new(static_context().await).execute().await;
-
         // If shutdown is unexpected, cancel running missions and exit nonzero
         if exit_status != 0 {
             // Cancel running missions
@@ -310,7 +274,6 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
     let config = config().await;
     println!("Running {mission}");
     let res = match mission.to_lowercase().as_str() {
-        "arm" => ctwrap!(WaitArm::new(static_context().await).execute()),
         "empty" => {
             let control_board = control_board().await;
             control_board
@@ -401,7 +364,6 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
         }
         "descend" | "forward" => ctwrap!(descend_and_go_forward(&FullActionContext::new(
             control_board().await,
-            meb().await,
             front_cam().await,
             bottom_cam().await,
             zed_ros2().await,
@@ -410,7 +372,6 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
         "gate_run_coinflip" => ctwrap!(gate_run_cv_procedural(
             &FullActionContext::new(
                 control_board().await,
-                meb().await,
                 front_cam().await,
                 bottom_cam().await,
                 zed_ros2().await,
@@ -421,7 +382,6 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
         "gate_run_yolo" => ctwrap!(gate_run_procedural(
             &FullActionContext::new(
                 control_board().await,
-                meb().await,
                 front_cam().await,
                 bottom_cam().await,
                 zed_ros2().await,
@@ -431,7 +391,6 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
         "gate_run_reckon" => ctwrap!(gate_run_dead_reckon(
             &FullActionContext::new(
                 control_board().await,
-                meb().await,
                 front_cam().await,
                 bottom_cam().await,
                 zed_ros2().await,
@@ -449,7 +408,6 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
         "path_align" => ctwrap!(path_align_procedural(
             &FullActionContext::new(
                 control_board().await,
-                meb().await,
                 front_cam().await,
                 bottom_cam().await,
                 zed_ros2().await,
@@ -460,7 +418,6 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
         "static_align" => ctwrap!(static_align_procedural(
             &FullActionContext::new(
                 control_board().await,
-                meb().await,
                 front_cam().await,
                 bottom_cam().await,
                 zed_ros2().await,
@@ -469,7 +426,6 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
         )),
         "example" => ctwrap!(initial_descent(&FullActionContext::new(
             control_board().await,
-            meb().await,
             front_cam().await,
             bottom_cam().await,
             zed_ros2().await,
@@ -477,7 +433,6 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
         .execute()),
         "pid_test" => ctwrap!(pid_test(&FullActionContext::new(
             control_board().await,
-            meb().await,
             front_cam().await,
             bottom_cam().await,
             zed_ros2().await,
@@ -490,13 +445,6 @@ async fn run_mission(mission: &str, cancel: CancellationToken) -> Result<()> {
         )
         .execute()),
         "spin" => ctwrap!(spin(static_context().await, &config.missions.spin)),
-        "torpedo_only" => {
-            FireRightTorpedo::new(static_context().await)
-                .execute()
-                .await;
-            FireLeftTorpedo::new(static_context().await).execute().await;
-            Ok(())
-        }
         "coinflip" => {
             ctwrap!(coinflip_procedural(
                 static_context().await,

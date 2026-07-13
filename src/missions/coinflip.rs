@@ -12,12 +12,12 @@ use crate::{
 
 use super::{
     action::ActionExec,
-    action_context::{FrontCamIO, GetControlBoard, GetMainElectronicsBoard},
+    action_context::{FrontCamIO, GetControlBoard},
     vision::VisionNorm,
 };
 
 pub async fn coinflip_procedural<
-    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + GetMainElectronicsBoard + FrontCamIO,
+    Con: Send + Sync + GetControlBoard<WriteHalf<SerialStream>> + FrontCamIO,
 >(
     context: &Con,
     config: &Config,
