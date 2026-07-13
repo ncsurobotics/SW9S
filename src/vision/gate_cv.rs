@@ -1,6 +1,7 @@
 use crate::config::ColorProfile;
 
 use super::{image_prep::resize, MatWrapper, PosVector, VisualDetection, VisualDetector, Yuv};
+use color_eyre::eyre::Result;
 use opencv::{
     core::{in_range, Point, Scalar, Size, Vector},
     imgproc::{
@@ -76,7 +77,7 @@ impl VisualDetector<f64> for GateCV {
     fn detect(
         &mut self,
         input_image: &Mat,
-    ) -> anyhow::Result<Vec<VisualDetection<Self::ClassEnum, Self::Position>>> {
+    ) -> Result<Vec<VisualDetection<Self::ClassEnum, Self::Position>>> {
         self.image = resize(input_image, &self.size)?.into();
         let mut yuv_image = Mat::default();
 

@@ -1,4 +1,4 @@
-use anyhow::{bail, Result};
+use color_eyre::eyre::{bail, Result};
 use std::env::temp_dir;
 
 use std::env;
@@ -6,7 +6,10 @@ use std::process::exit;
 use std::time::Duration;
 use sw9s_lib::{
     comms::{
-        control_board::{ControlBoard, SensorStatuses},
+        control_board::{
+            vehicle_definition::{MotorMatrix, VehicleDefinition},
+            ControlBoard, SensorStatuses,
+        },
         meb::MainElectronicsBoard,
         zed_ros2::ZedRos2,
     },
@@ -49,7 +52,7 @@ async fn config() -> &'static Config {
     CONFIG_CELL
         .get_or_init(|| async {
             Config::new().unwrap_or_else(|e| {
-                logln!("Error getting config file: {:#?}\nUsing default config", e);
+                logln!("Error getting config file: {e}\nUsing default config");
                 Config::default()
             })
         })
@@ -61,17 +64,43 @@ async fn control_board() -> &'static ControlBoard<WriteHalf<SerialStream>> {
     let config = config().await;
     CONTROL_BOARD_CELL
         .get_or_init(|| async {
-            let board = ControlBoard::serial(config.control_board_path.as_str()).await;
+            let motor_matrix = MotorMatrix::builder(8)
+                .set_row(1, [-1.0, 1.0, 0.0, 0.0, 0.0, -1.0].into())
+                .set_row(2, [1.0, 1.0, 0.0, 0.0, 0.0, 1.0].into())
+                .set_row(3, [-1.0, -1.0, 0.0, 0.0, 0.0, 1.0].into())
+                .set_row(4, [1.0, -1.0, 0.0, 0.0, 0.0, -1.0].into())
+                .set_row(5, [0.0, 0.0, -1.0, 1.0, -1.0, 0.0].into())
+                .set_row(6, [0.0, 0.0, -1.0, 1.0, 1.0, 0.0].into())
+                .set_row(7, [0.0, 0.0, -1.0, -1.0, -1.0, 0.0].into())
+                .set_row(8, [0.0, 0.0, -1.0, -1.0, 1.0, 0.0].into())
+                .build();
+            let vehicle_def = VehicleDefinition::new(
+                motor_matrix,
+                [true, true, false, false, true, false, false, true].into(),
+                [0.7071, 0.7071, 1.0, 0.4413, 1.0, 0.8139],
+                [
+                    ('X', 0.8, 0.0, 0.0, 0.6, false).into(),
+                    ('Y', 2.0, 0.0, 0.0, 0.1, false).into(),
+                    ('Z', 4.0, 0.0, 0.0, 1.0, false).into(),
+                    ('D', 1.5, 0.0, 0.0, 1.0, false).into(),
+                ],
+            )
+            .inspect_err(|e| logln!("Invalid vehicle definition: {:#?}", e))
+            .unwrap();
+            let board =
+                ControlBoard::serial(config.control_board_path.as_str(), &vehicle_def).await;
             match board {
                 Ok(x) => x,
                 Err(e) => {
-                    logln!("Error initializing control board: {:#?}", e);
-                    let backup_board =
-                        ControlBoard::serial(config.control_board_backup_path.as_str())
-                            .await
-                            .unwrap();
+                    logln!("Error initializing control board: {e}");
+                    let backup_board = ControlBoard::serial(
+                        config.control_board_backup_path.as_str(),
+                        &vehicle_def,
+                    )
+                    .await
+                    .unwrap();
                     backup_board.reset().await.unwrap();
-                    ControlBoard::serial(config.control_board_path.as_str())
+                    ControlBoard::serial(config.control_board_path.as_str(), &vehicle_def)
                         .await
                         .unwrap()
                 }
@@ -150,6 +179,7 @@ static SHUTDOWN_GUARD: Semaphore = Semaphore::const_new(1);
 
 #[tokio::main]
 async fn main() {
+    color_eyre::install().unwrap();
     let (shutdown_tx, mission_ct) = shutdown_handler().await;
 
     let stream = rerun::RecordingStreamBuilder::new("SWS9")

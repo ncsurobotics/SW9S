@@ -1,5 +1,6 @@
 use super::{image_prep::resize, MatWrapper, PosVector, VisualDetection, VisualDetector, Yuv};
 use crate::{config::ColorProfile, vision::Draw};
+use color_eyre::eyre::Result;
 use opencv::{
     core::{in_range, Point, Scalar, Size, Vector},
     imgproc::{
@@ -11,7 +12,7 @@ use opencv::{
 use std::ops::RangeInclusive;
 
 impl Draw for VisualDetection<bool, PosVector> {
-    fn draw(&self, canvas: &mut Mat) -> anyhow::Result<()> {
+    fn draw(&self, canvas: &mut Mat) -> Result<()> {
         let color = if self.class {
             logln!("Drawing true: {:#?}", self.position());
             Scalar::from((0.0, 255.0, 0.0))
@@ -106,7 +107,7 @@ impl VisualDetector<i32> for PathCV {
     fn detect(
         &mut self,
         input_image: &Mat,
-    ) -> anyhow::Result<Vec<VisualDetection<Self::ClassEnum, Self::Position>>> {
+    ) -> Result<Vec<VisualDetection<Self::ClassEnum, Self::Position>>> {
         self.image = resize(input_image, &self.size)?.into();
         let mut yuv_image = Mat::default();
 
@@ -215,7 +216,7 @@ impl VisualDetector<f64> for PathCV {
     fn detect(
         &mut self,
         input_image: &Mat,
-    ) -> anyhow::Result<Vec<VisualDetection<Self::ClassEnum, Self::Position>>> {
+    ) -> Result<Vec<VisualDetection<Self::ClassEnum, Self::Position>>> {
         self.image = resize(input_image, &self.size)?.into();
         let mut yuv_image = Mat::default();
 

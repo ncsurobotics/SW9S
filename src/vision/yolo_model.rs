@@ -7,7 +7,7 @@ use super::{
     nn_cv2::{YoloClass, YoloDetection},
     Draw, DrawRect2d, RelPos, VisualDetection, VisualDetector,
 };
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use opencv::{
     core::{Point, Rect2d, Scalar, Size},
     imgproc::{self, LINE_AA},

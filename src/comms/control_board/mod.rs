@@ -1,7 +1,12 @@
+//! High-level implementation of the [AUVControlBoard] messaging specification
+//!
+//! The underlying communication protocol is implemented in the [auv_control_board](crate::comms::auv_control_board) module
+//!
+//! [AUVControlBoard]: https://github.com/ncsurobotics/AUVControlBoard
+
 use core::fmt::Debug;
 use std::{ops::Deref, sync::Arc, time::Duration};
 
-use anyhow::{anyhow, bail, Result};
 use tokio::{
     io::{self, AsyncRead, AsyncWrite, AsyncWriteExt, WriteHalf},
     net::TcpStream,
@@ -12,7 +17,8 @@ use tokio_serial::{DataBits, Parity, SerialStream, StopBits};
 
 use self::{
     response::ResponseMap,
-    util::{Angles, BNO055AxisConfig},
+    util::{Angles, BNO055AxisConfig, ControlBoardError, Result},
+    vehicle_definition::{MotorMatrix, PidAxes, VehicleDefinition},
 };
 
 use super::auv_control_board::{AUVControlBoard, MessageId};
@@ -20,15 +26,22 @@ use crate::logln;
 
 pub mod response;
 pub mod util;
+pub mod vehicle_definition;
 
+/// Status of the control board's sensors
 pub enum SensorStatuses {
+    /// IMU ready
     ImuNr,
+    /// Depth sensor ready
     DepthNr,
+    /// Sensors healthy
     AllGood,
 }
 
+/// The last yaw reported by the control board
 pub static LAST_YAW: std::sync::Mutex<Option<f32>> = std::sync::Mutex::new(None);
 
+/// Represents a control board
 #[derive(Debug)]
 pub struct ControlBoard<T>
 where
@@ -46,14 +59,15 @@ impl<T: AsyncWriteExt + Unpin> Deref for ControlBoard<T> {
 }
 
 impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
-    pub async fn new<U>(comm_out: T, comm_in: U, msg_id: Option<MessageId>) -> Result<Self>
+    pub async fn new<U>(
+        comm_out: T,
+        comm_in: U,
+        msg_id: Option<MessageId>,
+        vehicle_defintion: &VehicleDefinition,
+    ) -> Result<Self>
     where
         U: 'static + AsyncRead + Unpin + Send,
     {
-        const THRUSTER_INVS: [bool; 8] = [true, true, false, false, true, false, false, true];
-        #[allow(clippy::approx_constant)]
-        const DOF_SPEEDS: [f32; 6] = [0.7071, 0.7071, 1.0, 0.4413, 1.0, 0.8139];
-
         let msg_id = msg_id.unwrap_or_default();
         let responses = ResponseMap::new(comm_in).await;
         let this = Self {
@@ -61,9 +75,11 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
             initial_angles: Arc::default(),
         };
 
-        this.init_matrices().await?;
-        this.thruster_inversion_set(&THRUSTER_INVS).await?;
-        this.relative_dof_speed_set_batch(&DOF_SPEEDS).await?;
+        this.init_matrices(&vehicle_defintion.motor_matrix).await?;
+        this.thruster_inversion_set(&vehicle_defintion.thruster_inversions)
+            .await?;
+        this.relative_dof_speed_set_batch(&vehicle_defintion.dof_speeds)
+            .await?;
         this.bno055_imu_axis_config(BNO055AxisConfig::P6).await?;
 
         loop {
@@ -76,7 +92,7 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         // Control board needs time to get its life together
         sleep(Duration::from_secs(5)).await;
 
-        this.stab_tune().await?;
+        this.stab_tune(&vehicle_defintion.pid_axes).await?;
 
         let inner_clone = this.inner.clone();
 
@@ -103,41 +119,36 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         Ok(this)
     }
 
-    async fn init_matrices(&self) -> Result<()> {
-        self.motor_matrix_set(3, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0)
-            .await?;
-        self.motor_matrix_set(4, 1.0, -1.0, 0.0, 0.0, 0.0, -1.0)
-            .await?;
-        self.motor_matrix_set(1, -1.0, 1.0, 0.0, 0.0, 0.0, -1.0)
-            .await?;
-        self.motor_matrix_set(2, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0)
-            .await?;
-        self.motor_matrix_set(7, 0.0, 0.0, -1.0, -1.0, -1.0, 0.0)
-            .await?;
-        self.motor_matrix_set(8, 0.0, 0.0, -1.0, -1.0, 1.0, 0.0)
-            .await?;
-        self.motor_matrix_set(5, 0.0, 0.0, -1.0, 1.0, -1.0, 0.0)
-            .await?;
-        self.motor_matrix_set(6, 0.0, 0.0, -1.0, 1.0, 1.0, 0.0)
-            .await?;
+    async fn init_matrices(&self, motor_matrix: &MotorMatrix) -> Result<()> {
+        for (i, _row) in motor_matrix.0.iter().enumerate() {
+            // If the row is defined for the thruster, then set it
+            if let Some(row) = _row {
+                self.motor_matrix_set(i as u8, row.x, row.y, row.z, row.pitch, row.roll, row.yaw)
+                    .await?;
+            }
+        }
 
         self.motor_matrix_update().await
     }
 
-    async fn stab_tune(&self) -> Result<()> {
-        self.stability_assist_pid_tune('X', 0.8, 0.0, 0.0, 0.6, false)
+    async fn stab_tune(&self, axes: &PidAxes) -> Result<()> {
+        for axis in axes {
+            self.stability_assist_pid_tune(
+                axis.which,
+                axis.kp,
+                axis.ki,
+                axis.kd,
+                axis.limit,
+                axis.invert,
+            )
             .await?;
-        self.stability_assist_pid_tune('Y', 2.0, 0.0, 0.0, 0.1, false)
-            .await?;
-        self.stability_assist_pid_tune('Z', 4.0, 0.0, 0.0, 1.0, false)
-            .await?;
-        self.stability_assist_pid_tune('D', 1.5, 0.0, 0.0, 1.0, false)
-            .await
+        }
+        Ok(())
     }
 }
 
 impl ControlBoard<WriteHalf<SerialStream>> {
-    pub async fn serial(port_name: &str) -> Result<Self> {
+    pub async fn serial(port_name: &str, vehicle_defintion: &VehicleDefinition) -> Result<Self> {
         const BAUD_RATE: u32 = 9600;
         const DATA_BITS: DataBits = DataBits::Eight;
         const PARITY: Parity = Parity::None;
@@ -148,14 +159,19 @@ impl ControlBoard<WriteHalf<SerialStream>> {
             .parity(PARITY)
             .stop_bits(STOP_BITS);
         let (comm_in, comm_out) = io::split(SerialStream::open(&port_builder)?);
-        Self::new(comm_out, comm_in, None).await
+        Self::new(comm_out, comm_in, None, vehicle_defintion).await
     }
 }
 
 impl ControlBoard<WriteHalf<TcpStream>> {
     /// Both connections are necessary for the simulator to run,
     /// but the one that doesn't feed forward to control board is unnecessary
-    pub async fn tcp(host: &str, port: &str, dummy_port: String) -> Result<Self> {
+    pub async fn tcp(
+        host: &str,
+        port: &str,
+        dummy_port: String,
+        vehicle_defintion: VehicleDefinition,
+    ) -> Result<Self> {
         let host = host.to_string();
         let host_clone = host.clone();
         tokio::spawn(async move {
@@ -170,7 +186,7 @@ impl ControlBoard<WriteHalf<TcpStream>> {
 
         let stream = TcpStream::connect(host.to_string() + ":" + port).await?;
         let (comm_in, comm_out) = io::split(stream);
-        Self::new(comm_out, comm_in, None).await
+        Self::new(comm_out, comm_in, None, &vehicle_defintion).await
     }
 }
 
@@ -199,7 +215,7 @@ impl<T: AsyncWrite + Unpin> ControlBoard<T> {
         message.extend(MOTOR_MATRIX_SET);
 
         if !(1..=8).contains(&thruster) {
-            bail!("{thruster} is outside the allowed range 1-8.")
+            return Err(ControlBoardError::ThrusterIndexing(thruster));
         };
 
         message.extend(thruster.to_le_bytes());
@@ -219,7 +235,7 @@ impl<T: AsyncWrite + Unpin> ControlBoard<T> {
     ///
     /// # Arguments:
     /// * `inversions` - Array of invert statuses, with motor 1 at index 0
-    pub async fn thruster_inversion_set(&self, inversions: &[bool; 8]) -> Result<()> {
+    pub async fn thruster_inversion_set(&self, inversions: &Vec<bool>) -> Result<()> {
         const THRUSTER_INVERSION_SET: [u8; 4] = *b"TINV";
         let mut message = Vec::from(THRUSTER_INVERSION_SET);
 
@@ -351,7 +367,7 @@ impl<T: AsyncWrite + Unpin> ControlBoard<T> {
             None => {
                 self.set_initial_angle().await?;
                 let angle =
-                    (*self.initial_angles.lock().await).ok_or(anyhow!("Initial Yaw set Error"))?;
+                    (*self.initial_angles.lock().await).ok_or(ControlBoardError::InitialYawSet)?;
                 *angle.yaw()
             }
         };
@@ -419,7 +435,7 @@ impl<T: AsyncWrite + Unpin> ControlBoard<T> {
         message.extend(STAB_TUNE);
 
         if !['X', 'Y', 'Z', 'D'].contains(&which) {
-            bail!("{which} is not a valid PID tune, pick from [X, Y, Z, D]")
+            return Err(ControlBoardError::InvalidPidTuneAxis(which));
         }
         message.push(which as u8);
 

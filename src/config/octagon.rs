@@ -1,5 +1,8 @@
+//! Configuration for the octagon family of missions
+
 use serde::{Deserialize, Serialize};
 
+/// Octagon mission config submodule
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {}
 

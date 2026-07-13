@@ -6,7 +6,7 @@ use crate::vision::Offset2D;
 use crate::vision::RelPos;
 use crate::vision::RelPosAngle;
 
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use core::fmt::Debug;
 use derive_getters::Getters;
 use num_traits::abs;
@@ -132,7 +132,7 @@ impl<T: GetControlBoard<WriteHalf<SerialStream>>> ActionExec<Result<()>>
             cur_angles = cntrl_board.responses().get_angles().await;
         }
 
-        cntrl_board
+        Ok(cntrl_board
             .stability_2_speed_set(
                 0.0,
                 speed,
@@ -141,7 +141,7 @@ impl<T: GetControlBoard<WriteHalf<SerialStream>>> ActionExec<Result<()>>
                 *cur_angles.unwrap().yaw(),
                 self.target_depth,
             )
-            .await
+            .await?)
     }
 }
 
@@ -163,10 +163,11 @@ impl<'a, T> ZeroMovement<'a, T> {
 
 impl<T: GetControlBoard<WriteHalf<SerialStream>>> ActionExec<Result<()>> for ZeroMovement<'_, T> {
     async fn execute(&mut self) -> Result<()> {
-        self.context
+        Ok(self
+            .context
             .get_control_board()
             .stability_2_speed_set_initial_yaw(0.0, 0.0, 0.0, 0.0, self.target_depth)
-            .await
+            .await?)
     }
 }
 
@@ -214,10 +215,11 @@ where
 
 impl<T: GetControlBoard<WriteHalf<SerialStream>>> ActionExec<Result<()>> for AdjustMovement<'_, T> {
     async fn execute(&mut self) -> Result<()> {
-        self.context
+        Ok(self
+            .context
             .get_control_board()
             .stability_2_speed_set_initial_yaw(self.x, 0.5, 0.0, 0.0, self.target_depth)
-            .await
+            .await?)
     }
 }
 
@@ -335,10 +337,11 @@ impl<T: GetControlBoard<WriteHalf<SerialStream>>> ActionExec<Result<()>>
         }
         logln!("Setting x to {x}");
 
-        self.context
+        Ok(self
+            .context
             .get_control_board()
             .stability_2_speed_set(x, 0.5, 0.0, 0.0, yaw, self.target_depth)
-            .await
+            .await?)
     }
 }
 
@@ -410,10 +413,11 @@ impl<T: GetControlBoard<WriteHalf<SerialStream>>> ActionExec<Result<()>> for Cen
             y = 0.0;
         }
 
-        self.context
+        Ok(self
+            .context
             .get_control_board()
             .stability_2_speed_set(x, y, 0.0, 0.0, yaw, self.target_depth)
-            .await
+            .await?)
     }
 }
 
@@ -570,7 +574,7 @@ impl Stability2Pos {
 
         //logln!("Stability 2 speed set: {:#?}", self);
 
-        board
+        Ok(board
             .stability_2_speed_set(
                 self.x,
                 self.y,
@@ -579,7 +583,7 @@ impl Stability2Pos {
                 self.target_yaw.unwrap(),
                 self.target_depth,
             )
-            .await
+            .await?)
     }
 
     /// Sets speed, bounded to [-1, 1]
@@ -1350,8 +1354,8 @@ impl<T: Send + Sync + Clone + Default> ActionMod<Option<T>> for OffsetToPose<T> 
     }
 }
 
-impl<T: Send + Sync + Clone + Default> ActionMod<anyhow::Result<T>> for OffsetToPose<T> {
-    fn modify(&mut self, input: &anyhow::Result<T>) {
+impl<T: Send + Sync + Clone + Default> ActionMod<color_eyre::eyre::Result<T>> for OffsetToPose<T> {
+    fn modify(&mut self, input: &color_eyre::eyre::Result<T>) {
         if let Ok(input) = input {
             self.offset = input.clone();
         } else {
@@ -1417,8 +1421,8 @@ impl<T: Send + Sync + Clone + Default> ActionMod<Option<T>> for BoxToPose<T> {
     }
 }
 
-impl<T: Send + Sync + Clone + Default> ActionMod<anyhow::Result<T>> for BoxToPose<T> {
-    fn modify(&mut self, input: &anyhow::Result<T>) {
+impl<T: Send + Sync + Clone + Default> ActionMod<color_eyre::eyre::Result<T>> for BoxToPose<T> {
+    fn modify(&mut self, input: &color_eyre::eyre::Result<T>) {
         if let Ok(input) = input {
             self.input = input.clone();
         } else {
@@ -1575,7 +1579,7 @@ impl Stability1Pos {
     pub async fn exec(&mut self, board: &ControlBoard<WriteHalf<SerialStream>>) -> Result<()> {
         logln!("Stability 1 speed set: {:#?}", self);
 
-        board
+        Ok(board
             .stability_1_speed_set(
                 self.x,
                 self.y,
@@ -1584,7 +1588,7 @@ impl Stability1Pos {
                 self.yaw_speed,
                 self.target_depth,
             )
-            .await
+            .await?)
     }
 
     /// Sets speed, bounded to [-1, 1]
@@ -2450,7 +2454,7 @@ impl GlobalPos {
 
     /// Executes the position in stability assist
     pub async fn exec(&mut self, board: &ControlBoard<WriteHalf<SerialStream>>) -> Result<()> {
-        board
+        Ok(board
             .global_speed_set(
                 self.x,
                 self.y,
@@ -2459,7 +2463,7 @@ impl GlobalPos {
                 self.roll_speed,
                 self.yaw_speed,
             )
-            .await
+            .await?)
     }
 
     pub const fn const_default() -> Self {

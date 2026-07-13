@@ -1,3 +1,5 @@
+//! Supporting library for `sw9s`, the high-level autonamous driver program for [SeaWolf IX](https://aquapackrobotics.org/seawolves/seawolfIX/), [AquaPack Robotics'](https://aquapackrobotics.org/) 9th gen autonamous underwater vehicle (AUV).
+
 use std::{
     fs::{create_dir, File},
     sync::{LazyLock, Mutex},

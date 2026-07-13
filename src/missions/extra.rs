@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use anyhow::{anyhow, bail};
+use color_eyre::eyre::{anyhow, bail, Result};
 
 use crate::logln;
 
@@ -112,8 +112,8 @@ impl<T: Send + Sync> ActionMod<T> for AlwaysTrue {
     fn modify(&mut self, _input: &T) {}
 }
 
-impl ActionExec<anyhow::Result<()>> for AlwaysTrue {
-    async fn execute(&mut self) -> anyhow::Result<()> {
+impl ActionExec<Result<()>> for AlwaysTrue {
+    async fn execute(&mut self) -> Result<()> {
         Ok(())
     }
 }
@@ -159,8 +159,8 @@ impl<T: Send + Sync> ActionMod<T> for AlwaysFalse {
     fn modify(&mut self, _input: &T) {}
 }
 
-impl ActionExec<anyhow::Result<()>> for AlwaysFalse {
-    async fn execute(&mut self) -> anyhow::Result<()> {
+impl ActionExec<Result<()>> for AlwaysFalse {
+    async fn execute(&mut self) -> Result<()> {
         bail!("")
     }
 }
@@ -197,7 +197,7 @@ impl<T: ActionMod<U>, U: Send + Sync> ActionMod<U> for UnwrapAction<T> {
     }
 }
 
-impl<T: ActionExec<anyhow::Result<U>>, U: Send + Sync> ActionExec<U> for UnwrapAction<T> {
+impl<T: ActionExec<Result<U>>, U: Send + Sync> ActionExec<U> for UnwrapAction<T> {
     async fn execute(&mut self) -> U {
         self.action.execute().await.unwrap()
     }
@@ -217,8 +217,8 @@ impl CountTrue {
 
 impl Action for CountTrue {}
 
-impl<T: Send + Sync> ActionMod<anyhow::Result<T>> for CountTrue {
-    fn modify(&mut self, input: &anyhow::Result<T>) {
+impl<T: Send + Sync> ActionMod<Result<T>> for CountTrue {
+    fn modify(&mut self, input: &Result<T>) {
         if input.is_ok() {
             self.count += 1;
             if self.count > self.target {
@@ -259,8 +259,8 @@ impl ActionMod<bool> for CountTrue {
     }
 }
 
-impl ActionExec<anyhow::Result<()>> for CountTrue {
-    async fn execute(&mut self) -> anyhow::Result<()> {
+impl ActionExec<Result<()>> for CountTrue {
+    async fn execute(&mut self) -> Result<()> {
         logln!("Check true count: {} ? {}", self.count, self.target);
         if self.count < self.target {
             Ok(())
@@ -284,8 +284,8 @@ impl CountFalse {
 
 impl Action for CountFalse {}
 
-impl<T: Send + Sync> ActionMod<anyhow::Result<T>> for CountFalse {
-    fn modify(&mut self, input: &anyhow::Result<T>) {
+impl<T: Send + Sync> ActionMod<Result<T>> for CountFalse {
+    fn modify(&mut self, input: &Result<T>) {
         if input.is_err() {
             self.count += 1;
             if self.count > self.target {
@@ -326,8 +326,8 @@ impl ActionMod<bool> for CountFalse {
     }
 }
 
-impl ActionExec<anyhow::Result<()>> for CountFalse {
-    async fn execute(&mut self) -> anyhow::Result<()> {
+impl ActionExec<Result<()>> for CountFalse {
+    async fn execute(&mut self) -> Result<()> {
         logln!("Check false count: {} ? {}", self.count, self.target);
         if self.count < self.target {
             Ok(())
@@ -363,13 +363,10 @@ impl<T: ActionMod<V>, U: ActionMod<V>, V: Send + Sync> ActionMod<V> for InOrderF
     }
 }
 
-impl<
-        T: ActionExec<anyhow::Result<V>>,
-        U: ActionExec<anyhow::Result<V>>,
-        V: Send + Sync + Default,
-    > ActionExec<anyhow::Result<V>> for InOrderFail<T, U>
+impl<T: ActionExec<Result<V>>, U: ActionExec<Result<V>>, V: Send + Sync + Default>
+    ActionExec<Result<V>> for InOrderFail<T, U>
 {
-    async fn execute(&mut self) -> anyhow::Result<V> {
+    async fn execute(&mut self) -> Result<V> {
         if !self.finished_first {
             let ret = self.first.execute().await;
             self.finished_first = ret.is_err();
@@ -453,10 +450,10 @@ impl<T: Send + Sync + Debug, U: IntoIterator<Item = T> + Send + Sync + Clone> Ac
     }
 }
 
-impl<T: Send + Sync, U: IntoIterator<Item = T> + Send + Sync + Clone> ActionMod<anyhow::Result<U>>
+impl<T: Send + Sync, U: IntoIterator<Item = T> + Send + Sync + Clone> ActionMod<Result<U>>
     for ToVec<T>
 {
-    fn modify(&mut self, input: &anyhow::Result<U>) {
+    fn modify(&mut self, input: &Result<U>) {
         if let Ok(input) = input {
             self.value = input.clone().into_iter().collect();
         } else {
@@ -504,10 +501,10 @@ impl<T: Send + Sync + Debug, U: IntoIterator<Item = T> + Send + Sync + Clone> Ac
     }
 }
 
-impl<T: Send + Sync, U: IntoIterator<Item = T> + Send + Sync + Clone> ActionMod<anyhow::Result<U>>
+impl<T: Send + Sync, U: IntoIterator<Item = T> + Send + Sync + Clone> ActionMod<Result<U>>
     for IsSome<T>
 {
-    fn modify(&mut self, input: &anyhow::Result<U>) {
+    fn modify(&mut self, input: &Result<U>) {
         if let Ok(input) = input {
             self.value = input.clone().into_iter().collect();
         } else {
@@ -543,8 +540,8 @@ impl<T: Send + Sync> ActionMod<T> for AlwaysBetterTrue {
     fn modify(&mut self, _input: &T) {}
 }
 
-impl ActionExec<anyhow::Result<()>> for AlwaysBetterTrue {
-    async fn execute(&mut self) -> anyhow::Result<()> {
+impl ActionExec<Result<()>> for AlwaysBetterTrue {
+    async fn execute(&mut self) -> Result<()> {
         Ok(())
     }
 }
@@ -570,8 +567,8 @@ impl<T: Send + Sync> ActionMod<T> for AlwaysBetterFalse {
     fn modify(&mut self, _input: &T) {}
 }
 
-impl ActionExec<anyhow::Result<()>> for AlwaysBetterFalse {
-    async fn execute(&mut self) -> anyhow::Result<()> {
+impl ActionExec<Result<()>> for AlwaysBetterFalse {
+    async fn execute(&mut self) -> Result<()> {
         bail!("")
     }
 }
