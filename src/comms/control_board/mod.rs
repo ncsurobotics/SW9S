@@ -123,7 +123,15 @@ impl<T: 'static + AsyncWriteExt + Unpin + Send> ControlBoard<T> {
         for (i, _row) in motor_matrix.0.iter().enumerate() {
             // If the row is defined for the thruster, then set it
             if let Some(row) = _row {
-                self.motor_matrix_set(i as u8, row.x, row.y, row.z, row.pitch, row.roll, row.yaw)
+                self.motor_matrix_set(
+                    (i + 1) as u8,
+                    row.x,
+                    row.y,
+                    row.z,
+                    row.pitch,
+                    row.roll,
+                    row.yaw,
+                )
                     .await?;
             }
         }
