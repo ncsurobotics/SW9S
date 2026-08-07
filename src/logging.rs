@@ -1,4 +1,4 @@
-pub use color_eyre::eyre::{bail, eyre, Result};
+pub use color_eyre::eyre::{bail, eyre, Result, WrapErr};
 pub use tracing::{error, info, instrument, trace, warn};
 
 /// Sets up logging frameworks

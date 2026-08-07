@@ -1,4 +1,6 @@
-use crate::logging::Result;
+use std::path::Path;
+
+use crate::logging::{Result, WrapErr};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -11,9 +13,9 @@ impl Config {
     /// # Errors
     ///
     /// This function will return an error if `config.toml` does not exist.
-    pub fn new() -> Result<Self> {
-        let text = std::fs::read_to_string("config.toml")?;
-        Ok(toml::from_str(&text)?)
+    pub fn new(path: &Path) -> Result<Self> {
+        let text = std::fs::read_to_string(path).wrap_err("Failed to open config.toml")?;
+        Ok(toml::from_str(&text).wrap_err("Failed to parse config.toml")?)
     }
 }
 

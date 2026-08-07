@@ -14,7 +14,7 @@ use tokio_util::sync::CancellationToken;
 async fn main() -> Result<()> {
     logging::install()?;
     let args = Args::parse();
-    let config = Config::new()?;
+    let config = Config::new(&args.config)?;
     info!("{:#?}", config);
 
     let shutdown_token = CancellationToken::new();
