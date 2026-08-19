@@ -1,84 +1,29 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    fenix = {
-      url = "github:nix-community/fenix";
+    nixpkgs.url = "github:nixos/nixpkgs/nixpkgs-unstable";
+    flake-parts = {
+      url = "github:hercules-ci/flake-parts";
+      inputs.nixpkgs-lib.follows = "nixpkgs";
+    };
+    systems.url = "github:nix-systems/default";
+    rust-flake = {
+      url = "github:juspay/rust-flake";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    flake-parts.url = "github:hercules-ci/flake-parts";
+    git-hooks = {
+      url = "github:cachix/git-hooks.nix";
+      flake = false;
+    };
   };
 
   outputs = inputs:
-    inputs.flake-parts.lib.mkFlake {inherit inputs;} {
-      systems = ["x86_64-linux"];
-      perSystem = {
-        pkgs,
-        config,
-        ...
-      }: {
-        devShells = let
-          rustToolchain = with inputs.fenix.packages.${pkgs.system};
-            combine (
-              with stable; [
-                clippy
-                rustc
-                cargo
-                rustfmt
-                rust-src
-                targets.aarch64-unknown-linux-gnu.stable.rust-std
-              ]
-            );
-          rustPackages = with pkgs; [
-            rustToolchain
-            openssl
-            pkg-config
-            cargo-deny
-            cargo-edit
-            cargo-watch
-            cargo-expand
-            cargo-info
-            cargo-machete
-            rust-analyzer
-            bacon
-          ];
-        in {
-          default =
-            (pkgs.buildFHSEnv {
-              name = "sw9s-fhs";
-              targetPkgs = pkgs:
-                with pkgs.llvmPackages_19;
-                  [
-                    libclang
-                    libllvm
-                    bintools
-                    clang
-                  ]
-                  ++ rustPackages;
-              extraOutputsToInstall = [
-                "dev"
-                "out"
-              ];
-              profile = ''
-                export JETSON_DEVSHELL_MODE=1
-              '';
-            }).env;
-          noFHS = pkgs.mkShell {
-            nativeBuildInputs = [pkgs.pkg-config];
-            buildInputs = with pkgs;
-              [
-                llvmPackages_19.clang
-                opencv
-              ]
-              ++ rustPackages;
-            LIBCLANG_PATH = "${pkgs.llvmPackages_19.libclang.lib}/lib";
-          };
-        };
-        formatter = pkgs.nixfmt-tree;
-        packages.image = pkgs.dockerTools.streamNixShellImage {
-          name = "test";
-          tag = "latest";
-          drv = config.devShells.fhs;
-        };
-      };
+    inputs.flake-parts.lib.mkFlake { inherit inputs; } {
+      systems = import inputs.systems;
+
+      # See ./nix/modules/*.nix for the modules that are imported here.
+      imports = with builtins;
+        map
+          (fn: ./nix/modules/${fn})
+          (attrNames (readDir ./nix/modules));
     };
 }
