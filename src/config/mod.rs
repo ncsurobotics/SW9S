@@ -1,11 +1,34 @@
 use std::{fs::OpenOptions, io::Write, path::Path};
 
 use crate::logging::{info, Result, WrapErr};
+use auv_control_board::{motor_matrix, pid_axes, vehicle::Definition};
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize, Default)]
+const VEHICLE_DEFINITION: Definition<8> = Definition::new(
+    motor_matrix! [
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false;
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false;
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false;
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false;
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false;
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false;
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false;
+        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false;
+    ],
+    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
+    pid_axes! [
+        X, 0.0, 0.0, 0.0, 0.0, false;
+        X, 0.0, 0.0, 0.0, 0.0, false;
+        X, 0.0, 0.0, 0.0, 0.0, false;
+        X, 0.0, 0.0, 0.0, 0.0, false;
+    ],
+);
+
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct Config {}
+pub struct Config {
+    vehicle: Definition<8>,
+}
 
 impl Config {
     /// Generates a populated [`Config`] from the provided config file
@@ -45,5 +68,13 @@ impl Config {
         Self::new(path)?;
         info!("{:#?} contains a valid config", path);
         Ok(())
+    }
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            vehicle: VEHICLE_DEFINITION,
+        }
     }
 }
