@@ -790,7 +790,7 @@ checksum = "f2032f911046de80f0a198e0901378627c33f59ea0ac00e363d481118bd70a53"
 [[package]]
 name = "auv_control_board"
 version = "1.1.0"
-source = "git+https://github.com/ncsurobotics/AUVControlBoard.git#2c481424e9ea617e874d0f6855956164857f8146"
+source = "git+https://github.com/ncsurobotics/AUVControlBoard.git#c45427b8ba0d827357df165580746f9130d4fd7f"
 dependencies = [
  "bytes",
  "derive-getters",

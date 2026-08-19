@@ -1,5 +1,5 @@
 use sw9s::{
-    cli::{Args, Parser},
+    cli::{CfgSubcmd, Cli, Parser, RunArgs, Subcmd},
     config::Config,
     logging::{self, error, info, instrument, Result},
     missions::run_mission,
@@ -13,9 +13,21 @@ use tokio_util::sync::CancellationToken;
 #[tokio::main]
 async fn main() -> Result<()> {
     logging::install()?;
-    let args = Args::parse();
+    let args = Cli::parse();
+    match args.subcmd {
+        Subcmd::Run(args) => run(args).await,
+        Subcmd::Cfg(subcmd) => match subcmd {
+            CfgSubcmd::Check { file } => Config::check(&file),
+            CfgSubcmd::Generate { file, force } => Config::save_default(&file, force),
+        },
+    }
+}
+
+async fn run(args: RunArgs) -> Result<()> {
     let config = Config::new(&args.config)?;
     info!("{:#?}", config);
+
+    // let cb = auv_control_board::ControlBoard::serial("/dev/ttyACM0", &config.vehicle);
 
     let shutdown_token = CancellationToken::new();
     let shutdown_handler_task = spawn(shutdown_handler(shutdown_token.clone()));
