@@ -1,4 +1,8 @@
+//! Configures error reporting, structured logging, and Tokio console tracing.
+
+/// Shared error construction, result, and context helpers.
 pub use color_eyre::eyre::{bail, eyre, Result, WrapErr};
+/// Logging and instrumentation macros used throughout the application.
 pub use tracing::{debug, error, info, instrument};
 
 /// Sets up logging frameworks

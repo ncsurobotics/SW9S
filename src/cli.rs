@@ -1,13 +1,19 @@
+//! Defines command-line arguments for mission execution and configuration.
+
+/// Command-line parsing traits and derive macros used by the application.
 pub use clap::{Args, Parser, Subcommand};
 use std::path::PathBuf;
 
+/// Command-line options for the SeaWolf 9 application.
 #[derive(Parser, Debug)]
 #[clap(author = "AquaPack Robotics", version, about)]
 pub struct Cli {
+    /// Command to execute.
     #[command(subcommand)]
     pub subcmd: Subcmd,
 }
 
+/// Available application commands.
 #[derive(Subcommand, Debug)]
 pub enum Subcmd {
     /// Run missions
@@ -17,6 +23,7 @@ pub enum Subcmd {
     Cfg(CfgSubcmd),
 }
 
+/// Commands for validating or generating configuration files.
 #[derive(Subcommand, Debug)]
 pub enum CfgSubcmd {
     /// Validate configuration file
@@ -36,6 +43,7 @@ pub enum CfgSubcmd {
     },
 }
 
+/// Configuration path and mission names for a run.
 #[derive(Args, Debug)]
 pub struct RunArgs {
     /// Path to the config file

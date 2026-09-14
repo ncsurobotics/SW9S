@@ -1,3 +1,14 @@
+//! Runs SeaWolf 9 missions and provides configuration commands.
+//!
+//! # Quickstart
+//!
+//! ```sh
+//! sw9s cfg generate
+//! $EDITOR config.toml
+//! sw9s cfg check
+//! sw9s run gate slalom bin
+//! ```
+
 mod cli;
 mod comms;
 mod config;
@@ -16,6 +27,7 @@ use std::time::Duration;
 use tokio::{spawn, time::sleep};
 use tokio_util::sync::CancellationToken;
 
+/// Initializes logging and dispatches the selected command.
 #[instrument]
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -30,6 +42,7 @@ async fn main() -> Result<()> {
     }
 }
 
+/// Runs missions in order and waits for the arm and shutdown handlers to finish.
 #[instrument(skip_all)]
 async fn run(args: RunArgs) -> Result<()> {
     let config = Config::new(&args.config)?;

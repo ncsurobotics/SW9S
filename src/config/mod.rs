@@ -1,9 +1,12 @@
+//! Loads, validates, and generates TOML vehicle configuration.
+
 use std::{fs::OpenOptions, io::Write, path::Path};
 
 use crate::logging::{info, Result, WrapErr};
 use auv_control_board::{motor_matrix, pid_axes, vehicle::Definition};
 use serde::{Deserialize, Serialize};
 
+/// Default vehicle definition with zeroed motor, speed, and PID settings.
 const VEHICLE_DEFINITION: Definition<8> = Definition::new(
     motor_matrix! [
         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, false;
@@ -24,12 +27,15 @@ const VEHICLE_DEFINITION: Definition<8> = Definition::new(
     ],
 );
 
+/// Application configuration stored in a TOML file.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
+    /// Motor matrix, initial speeds, and PID settings for the control board.
     pub vehicle: Definition<8>,
 }
 
+/// Configuration file operations.
 impl Config {
     /// Generates a populated [`Config`] from the provided config file
     ///
@@ -71,7 +77,9 @@ impl Config {
     }
 }
 
+/// Supplies the built-in vehicle configuration.
 impl Default for Config {
+    /// Creates a configuration using the default vehicle definition.
     fn default() -> Self {
         Self {
             vehicle: VEHICLE_DEFINITION,
