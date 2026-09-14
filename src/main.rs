@@ -1,7 +1,10 @@
+#![recursion_limit = "256"]
+
 use sw9s::{
     cli::{CfgSubcmd, Cli, Parser, RunArgs, Subcmd},
+    comms::control_board,
     config::Config,
-    logging::{self, error, info, instrument, Result},
+    logging::{self, debug, error, info, instrument, Result},
     missions::run_mission,
 };
 
@@ -23,11 +26,10 @@ async fn main() -> Result<()> {
     }
 }
 
+#[instrument(skip_all)]
 async fn run(args: RunArgs) -> Result<()> {
     let config = Config::new(&args.config)?;
-    info!("{:#?}", config);
-
-    // let cb = auv_control_board::ControlBoard::serial("/dev/ttyACM0", &config.vehicle);
+    debug!("{:#?}", config);
 
     let shutdown_token = CancellationToken::new();
     let shutdown_handler_task = spawn(shutdown_handler(shutdown_token.clone()));
@@ -41,6 +43,7 @@ async fn run(args: RunArgs) -> Result<()> {
             break;
         }
     }
+
     if !shutdown_token.is_cancelled() {
         info!("Mission execution finished, signaling shutdown");
         shutdown_token.cancel();
@@ -56,17 +59,21 @@ async fn run(args: RunArgs) -> Result<()> {
 /// Stops thrusters and resets manipulators upon recieving shutdown signal
 #[instrument(skip_all)]
 async fn shutdown_handler(shutdown_token: CancellationToken) -> Result<()> {
+    let cb = control_board().await?;
     shutdown_token.cancelled().await;
+
     info!("Begining shutdown sequence");
     // Log out cb sensor status
-    info!("Control Board Status: Healthy");
+    info!(
+        "Control Board Sensor Status: {:#?}",
+        cb.sensor_status_query().await.unwrap()
+    );
+
     // Shutdown motors
     info!("Stopping thrusters");
+    cb.relative_dof_speed_set_batch(&[0.0; 6]).await?;
     info!("Thrusters stopped");
-    // Reset torpedos (but not actually because it never completes)
-    info!("Reseting torpedos");
-    info!("Torpedos reset");
-    sleep(Duration::from_secs(5)).await; // All of the above takes 5 seconds for mockup purposes
+
     info!("Finished shutdown sequence");
     Ok(())
 }

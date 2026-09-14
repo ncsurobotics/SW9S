@@ -27,7 +27,7 @@ const VEHICLE_DEFINITION: Definition<8> = Definition::new(
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Config {
-    vehicle: Definition<8>,
+    pub vehicle: Definition<8>,
 }
 
 impl Config {
