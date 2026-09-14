@@ -1,10 +1,14 @@
-#![recursion_limit = "256"]
+mod cli;
+mod comms;
+mod config;
+mod logging;
+mod missions;
 
-use sw9s::{
+use crate::{
     cli::{CfgSubcmd, Cli, Parser, RunArgs, Subcmd},
     comms::control_board,
     config::Config,
-    logging::{self, debug, error, info, instrument, Result},
+    logging::{debug, error, info, instrument, Result},
     missions::run_mission,
 };
 
