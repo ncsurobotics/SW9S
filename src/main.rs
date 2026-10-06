@@ -20,10 +20,11 @@ use crate::{
     comms::control_board,
     config::Config,
     logging::{debug, error, info, instrument, Result},
-    missions::run_mission,
+    missions::{run_mission, SeaWolfState},
 };
 
-use std::time::Duration;
+use bonsai_bt::{Timer, BT};
+use std::{collections::HashMap, time::Duration};
 use tokio::{spawn, time::sleep};
 use tokio_util::sync::CancellationToken;
 
@@ -53,8 +54,19 @@ async fn run(args: RunArgs) -> Result<()> {
     let arm_handler_task = spawn(arm_handler(shutdown_token.clone()));
     let mut mission_result = Ok(());
 
+    let mut state = SeaWolfState { see_sharks: None };
+
+    let mut timer = Timer::init_time();
+
     for mission in args.missions {
-        mission_result = run_mission(&mission, shutdown_token.clone()).await;
+        let blackboard: HashMap<String, i32> = HashMap::new();
+        mission_result = run_mission(
+            &mission,
+            &mut state,
+            &mut timer,
+            &mut BT::new(bonsai_bt::Action(&mission), blackboard),
+        )
+        .await;
         if mission_result.is_err() {
             error!("Halting mission execution");
             break;
