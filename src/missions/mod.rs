@@ -5,6 +5,7 @@ use crate::{
     missions::tasks::gate_task,
 };
 use bonsai_bt::{
+    Behavior::{Action, After, Race, Sequence, While},
     Event,
     Status::{self, Failure, Success},
     Timer, UpdateArgs, BT, RUNNING,
@@ -19,7 +20,17 @@ use tokio_util::sync::CancellationToken;
 // States sea wolf can be in
 #[derive(Debug)]
 pub struct SeaWolfState {
-    pub see_sharks: Option<Receiver<Status>>,
+    pub see_goal: Option<Receiver<Status>>,
+}
+
+// Enum for actions by sea wolf in water
+#[derive(Clone, Debug, PartialEq)]
+pub enum mission_logic {
+    face_towards,
+    is_close,
+    swim,
+    style,
+    gate,
 }
 
 // Advances the mission behavior tree by one tick.
@@ -28,8 +39,18 @@ pub async fn run_mission(
     name: &str,
     state: &mut SeaWolfState,
     timer: &mut Timer,
-    bt: &mut BT<&str, HashMap<String, i32>>,
+    bt: &mut BT<mission_logic, HashMap<String, i32>>,
 ) -> Result<()> {
+    let face_towards = Action(mission_logic::face_towards);
+    let is_close = Action(mission_logic::is_close);
+    let swim = Action(mission_logic::swim);
+    let style = Action(mission_logic::style);
+
+    let move_to = Sequence(vec![
+        Action(face_towards),
+        Race(vec![Action(swim), Action(is_close)]),
+    ]);
+
     // have bt advance dt seconds into the future
     let dt = timer.get_dt();
 
@@ -38,36 +59,48 @@ pub async fn run_mission(
 
     // Update behavior tree
     #[rustfmt::skip]
-     bt.tick(&e,&mut |args: bonsai_bt::ActionArgs<Event, &str>, _|
+     bt.tick(&e,&mut |args: bonsai_bt::ActionArgs<Event, mission_logic>, _|
         match *args.action {
-            "gate" => {
-                let gate_state = &state.see_sharks;
+            mission_logic::face_towards => {
+                // Add action to face towards goal
+                (Status::Success, args.dt)
+            },
+            mission_logic::swim => {
+                // Add action to swim
+                (Status::Success, args.dt)
+            },
+            mission_logic::style => {
+                // Add action to style
+                (Status::Success, args.dt)
+            }
+            mission_logic::gate => {
+                let gate_state: &Option<Receiver<Status>> = &state.see_goal;
                 if let Some(gate_status) = gate_state {
                     match gate_status.recv() {
                         Ok(status) => {
                             match status {
                                 Success => {
-                                    // Add action if see sharks preferably turns see_sharks to none
+                                    // Add action if see sharks, preferably turns see_sharks to none
                                     (Status::Success, args.dt)
                                 },
                                 Failure => {
                                     // Add action if see sharks
-                                    state.see_sharks = None;
+                                    state.see_goal = None;
                                     (Status::Failure, args.dt)
                                 },
                                 Status::Running => RUNNING,
                             }
                         },
                         Err(_) => {
-                            state.see_sharks = None;
+                            state.see_goal = None;
                             (Status::Failure, args.dt)
                         },
                     }
                 } else {
                     let (tx, rx) = channel();
                     gate_task(tx);
-                    state.see_sharks = Some(rx);
-                    let receiver = state.see_sharks.as_ref().unwrap();
+                    state.see_goal = Some(rx);
+                    let receiver = state.see_goal.as_ref().unwrap();
                     let status = receiver.recv().unwrap();
                     (status, args.dt)
                 }

@@ -23,7 +23,10 @@ use crate::{
     missions::{run_mission, SeaWolfState},
 };
 
-use bonsai_bt::{Timer, BT};
+use bonsai_bt::{
+    Behavior::{Action, After, Race, Sequence, While},
+    Timer, BT,
+};
 use std::{collections::HashMap, time::Duration};
 use tokio::{spawn, time::sleep};
 use tokio_util::sync::CancellationToken;
@@ -54,17 +57,18 @@ async fn run(args: RunArgs) -> Result<()> {
     let arm_handler_task = spawn(arm_handler(shutdown_token.clone()));
     let mut mission_result = Ok(());
 
-    let mut state = SeaWolfState { see_sharks: None };
+    let mut state = SeaWolfState { see_goal: None };
 
     let mut timer = Timer::init_time();
 
     for mission in args.missions {
         let blackboard: HashMap<String, i32> = HashMap::new();
+        let mut behavior = Action(missions::mission_logic::gate);
         mission_result = run_mission(
             &mission,
             &mut state,
             &mut timer,
-            &mut BT::new(bonsai_bt::Action(&mission), blackboard),
+            &mut BT::new(behavior, blackboard),
         )
         .await;
         if mission_result.is_err() {
