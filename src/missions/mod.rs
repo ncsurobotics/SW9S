@@ -5,7 +5,7 @@ use crate::{
     config::TestMissionConfig,
     logging::{bail, error, eyre, info, Result},
 };
-use std::{future::Future, pin::Pin, time::Duration};
+use std::{future::Future, pin::Pin, time::Duration, u64};
 
 use tokio::time::sleep;
 use tokio_util::sync::CancellationToken;
@@ -21,6 +21,7 @@ pub async fn run_mission(
     let mission: Pin<Box<dyn Future<Output = Result<()>> + Send>> = match name {
         "sleep" => Box::pin(sleep_mission()),
         "test" => Box::pin(test_mission(test_config)),
+        "slow-spin" => Box::pin(slow_spin_mission()),
         _ => {
             error!("Unknown mission: {name}");
             bail!("Unknown mission: {name}")
@@ -62,6 +63,14 @@ async fn test_mission(config: TestMissionConfig) -> Result<()> {
 
     cb.stability_2_speed_set(0.0, 0.0, 0.0, 0.0, 0.0, config.depth_meters)
         .await?;
+    Ok(())
+}
+async fn slow_spin_mission() -> Result<()> {
+    let cb = control_board().await?;
+
+    info!("Doing slow spin");
+    cb.raw_speed_set([0.1; 8]).await?;
+    sleep(Duration::from_secs(u64::MAX)).await;
     Ok(())
 }
 
