@@ -33,6 +33,30 @@ const VEHICLE_DEFINITION: Definition<8> = Definition::new(
 pub struct Config {
     /// Motor matrix, initial speeds, and PID settings for the control board.
     pub vehicle: Definition<8>,
+    pub placeholder_arm_time: u64,
+    pub cb_path: String,
+    pub missions: MissionsConfig,
+}
+
+/// Configuration for the available missions.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MissionsConfig {
+    pub test: TestMissionConfig,
+}
+
+/// Parameters for the test mission.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TestMissionConfig {
+    /// Seconds to run the downward phase.
+    pub down_seconds: u64,
+    /// Seconds to run the forward phase.
+    pub forward_seconds: u64,
+    /// Target depth in meters; negative values are below the surface.
+    pub depth_meters: f32,
+    /// Forward speed in the control board's normalized range (-1 to 1).
+    pub forward_speed: f32,
 }
 
 /// Configuration file operations.
@@ -83,6 +107,16 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             vehicle: VEHICLE_DEFINITION,
+            placeholder_arm_time: 5,
+            cb_path: "/dev/serial/by-id/usb-STMicroelectronics_Control_Board_v2__Virtual_COM_Port__36313632303251010061003C-if00".to_string(),
+            missions: MissionsConfig {
+                test: TestMissionConfig {
+                    down_seconds: 5,
+                    forward_seconds: 5,
+                    depth_meters: -0.5,
+                    forward_speed: 0.25,
+                },
+            },
         }
     }
 }

@@ -23,7 +23,7 @@ use crate::{
     missions::run_mission,
 };
 
-use std::time::Duration;
+use std::{time::Duration, u64::MAX};
 use tokio::{spawn, time::sleep};
 use tokio_util::sync::CancellationToken;
 
@@ -50,11 +50,14 @@ async fn run(args: RunArgs) -> Result<()> {
 
     let shutdown_token = CancellationToken::new();
     let shutdown_handler_task = spawn(shutdown_handler(shutdown_token.clone()));
-    let arm_handler_task = spawn(arm_handler(shutdown_token.clone()));
+    let arm_handler_task = spawn(arm_handler(
+        shutdown_token.clone(),
+        config.placeholder_arm_time,
+    ));
     let mut mission_result = Ok(());
 
     for mission in args.missions {
-        mission_result = run_mission(&mission, shutdown_token.clone()).await;
+        mission_result = run_mission(&mission, config.missions.test, shutdown_token.clone()).await;
         if mission_result.is_err() {
             error!("Halting mission execution");
             break;
@@ -97,13 +100,13 @@ async fn shutdown_handler(shutdown_token: CancellationToken) -> Result<()> {
 
 /// Sends shutdown signal once robot is armed and subsequently disarmed
 #[instrument(skip_all)]
-async fn arm_handler(shutdown_token: CancellationToken) -> Result<()> {
+async fn arm_handler(shutdown_token: CancellationToken, placeholder_arm_time: u64) -> Result<()> {
     shutdown_token
         .run_until_cancelled(async {
             info!("Waiting for hardware arm");
-            sleep(Duration::from_secs(5)).await;
+            sleep(Duration::from_secs(placeholder_arm_time)).await;
             info!("Got hardware arm, waiting for disarm");
-            sleep(Duration::from_secs(5)).await;
+            sleep(Duration::from_secs(MAX)).await;
             info!("Got disarm, shutting down");
         })
         .await;

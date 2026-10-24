@@ -1,0 +1,32 @@
+name: Build Test Doc
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_WARNINGS: deny
+
+jobs:
+  build-test-doc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - run: rustup update stable && rustup default stable
+      - run: rustup component add clippy
+      - run: cargo clippy --locked --all-targets --all-features --keep-going
+      - run: cargo test --locked --all-targets --all-features
+      - run: cargo doc --locked --no-deps --document-private-items --bin sw9s
+      - name: Deploy to main documentation repository
+        uses: tagus/git-deploy@v0.5.0
+        with:
+          changes: 
+          repository: git@github.com:${{ github.repository_owner }}/documentation.git
+          branch: gh-pages
+          ssh_key: ${{ secrets.DOCS_DEPLOY_KEY }}
+          name: AquaPack Robotics
+          email: aquapack@aquapackrobotics.org
+          clean_repo: false

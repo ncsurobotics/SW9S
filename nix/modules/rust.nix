@@ -4,11 +4,12 @@
     inputs.rust-flake.flakeModules.default
     inputs.rust-flake.flakeModules.nixpkgs
   ];
-  perSystem = { config, self', pkgs, lib, ... }: {
+  perSystem = { self', pkgs, ... }: {
     rust-project.crates."sw9s".crane.args = {
       # On darwin, you may need framework dependencies like IOKit.
       # The default SDK now provides these automatically - no need to specify them.
       # buildInputs = lib.optionals pkgs.stdenv.isDarwin [ pkgs.apple-sdk ];
+      buildInputs = with pkgs; [pkg-config openssl];
     };
     packages.default = self'.packages.sw9s;
   };
