@@ -1,6 +1,8 @@
 /target
 /result
+/result-docker
 /result-lib
 .direnv
+/.cargo
 
 /.pre-commit-config.yaml

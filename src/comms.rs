@@ -11,6 +11,19 @@ use tokio::sync::OnceCell;
 /// Control board connection retained after successful initialization.
 static CONTROL_BOARD: OnceCell<SerialControlBoard> = OnceCell::const_new();
 
+/// Sends LOCAL speeds in protocol order: x, y, z, x rotation, y rotation, z rotation.
+/// The pinned control board library exposes the transport but has no LOCAL helper.
+pub async fn local_speed_set(speeds: [f32; 6]) -> Result<()> {
+    let cb = control_board().await?;
+    let mut message = Vec::with_capacity(29);
+    message.extend_from_slice(b"LOCAL");
+    for speed in speeds {
+        message.extend_from_slice(&speed.to_le_bytes());
+    }
+    cb.write_out_basic(message).await?;
+    Ok(())
+}
+
 /// Returns the shared control board, initializing it from the run configuration if needed.
 ///
 /// Returns an error if configuration loading or board initialization fails.

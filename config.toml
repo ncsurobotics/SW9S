@@ -1,5 +1,5 @@
 placeholder_arm_time = 5
-cb_path = "/dev/serial/by-id/usb-STMicroelectronics_Control_Board_v2__Virtual_COM_Port__36313632303251010061003C-if00"
+cb_path = "/dev/serial/by-id/usb-Adafruit_Control_Board_v1__ItsyBitsy_M4_Express__FF083B2F5337524651202020FA89E776-if00"
 
 [missions.test]
 down_seconds = 5
@@ -9,84 +9,92 @@ forward_speed = 0.25
 
 [vehicle]
 dof_speeds = [
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
-    0.0,
+    0.707,
+    0.707,
+    1.0,
+    1.0,
+    1.0,
+    1.0,
 ]
 
+# 1
 [[vehicle.motor_matrix]]
-x = 0.0
-y = 0.0
+x = 1.0
+y = 1.0
 z = 0.0
 pitch = 0.0
 roll = 0.0
+yaw = -1.0
+inverted = false
+
+# 2
+[[vehicle.motor_matrix]]
+x = 0.0
+y = 0.0
+z = -1.0
+pitch = 1.0
+roll = 1.0
 yaw = 0.0
 inverted = false
 
+# 3
 [[vehicle.motor_matrix]]
 x = 0.0
 y = 0.0
-z = 0.0
-pitch = 0.0
-roll = 0.0
+z = -1.0
+pitch = -1.0
+roll = 1.0
 yaw = 0.0
 inverted = false
 
+# 4
 [[vehicle.motor_matrix]]
-x = 0.0
-y = 0.0
+x = -1.0
+y = 1.0
 z = 0.0
 pitch = 0.0
 roll = 0.0
+yaw = -1.0
+inverted = false
+
+# 5
+[[vehicle.motor_matrix]]
+x = -1.0
+y = -1.0
+z = 0.0
+pitch = 0.0
+roll = 0.0
+yaw = -1.0
+inverted = false
+
+# 6
+[[vehicle.motor_matrix]]
+x = 0.0
+y = 0.0
+z = -1.0
+pitch = -1.0
+roll = -1.0
 yaw = 0.0
 inverted = false
 
+# 7
 [[vehicle.motor_matrix]]
 x = 0.0
 y = 0.0
-z = 0.0
-pitch = 0.0
-roll = 0.0
+z = -1.0
+pitch = 1.0
+roll = -1.0
 yaw = 0.0
 inverted = false
 
+# 8
 [[vehicle.motor_matrix]]
-x = 0.0
-y = 0.0
+x = 1.0
+y = -1.0
 z = 0.0
 pitch = 0.0
 roll = 0.0
-yaw = 0.0
-inverted = false
-
-[[vehicle.motor_matrix]]
-x = 0.0
-y = 0.0
-z = 0.0
-pitch = 0.0
-roll = 0.0
-yaw = 0.0
-inverted = false
-
-[[vehicle.motor_matrix]]
-x = 0.0
-y = 0.0
-z = 0.0
-pitch = 0.0
-roll = 0.0
-yaw = 0.0
-inverted = false
-
-[[vehicle.motor_matrix]]
-x = 0.0
-y = 0.0
-z = 0.0
-pitch = 0.0
-roll = 0.0
-yaw = 0.0
+yaw = -1.0
 inverted = false
 
 [[vehicle.pid_axes]]

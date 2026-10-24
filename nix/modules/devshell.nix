@@ -5,6 +5,17 @@
       jetson = pkgs.pkgsCross.aarch64-multiplatform-musl;
     in
     {
+      packages = lib.optionalAttrs pkgs.stdenv.isLinux {
+        docker = pkgs.dockerTools.buildNixShellImage {
+          name = "ghcr.io/ncsurobotics/sw9s-dev";
+          tag = "latest";
+          drv = config.devShells.default.overrideAttrs (old: {
+            nativeBuildInputs = old.nativeBuildInputs ++ [ pkgs.git pkgs.openssh ];
+          });
+          shell = "${pkgs.bashInteractive}/bin/bash";
+        };
+      };
+
       devShells.default = pkgs.mkShell ({
         name = "sw9s-shell";
         inputsFrom = [

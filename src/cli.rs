@@ -49,6 +49,7 @@ pub struct RunArgs {
     /// Path to the config file
     #[arg(short, long, default_value = "config.toml")]
     pub config: PathBuf,
-    /// List of missions to run
+    /// List of missions to run (e.g. motor-y-forward).
+    /// See src/missions/README.md for all 12 motor test missions.
     pub missions: Vec<String>,
 }

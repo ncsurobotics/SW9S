@@ -9,6 +9,10 @@
 //! sw9s run gate slalom bin
 //! ```
 
+// The control board's nested async transport exceeds the default query depth
+// during release code generation for the Jetson target.
+#![recursion_limit = "256"]
+
 mod cli;
 mod comms;
 mod config;
@@ -57,7 +61,7 @@ async fn run(args: RunArgs) -> Result<()> {
     let mut mission_result = Ok(());
 
     for mission in args.missions {
-        mission_result = run_mission(&mission, config.missions.test, shutdown_token.clone()).await;
+        mission_result = run_mission(&mission, config.missions, shutdown_token.clone()).await;
         if mission_result.is_err() {
             error!("Halting mission execution");
             break;
@@ -91,7 +95,7 @@ async fn shutdown_handler(shutdown_token: CancellationToken) -> Result<()> {
 
     // Shutdown motors
     info!("Stopping thrusters");
-    cb.relative_dof_speed_set_batch(&[0.0; 6]).await?;
+    cb.raw_speed_set([0.0; 8]).await?;
     info!("Thrusters stopped");
 
     info!("Finished shutdown sequence");

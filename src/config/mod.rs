@@ -39,10 +39,26 @@ pub struct Config {
 }
 
 /// Configuration for the available missions.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct MissionsConfig {
     pub test: TestMissionConfig,
+    #[serde(default)]
+    pub motor_test: MotorTestMissionConfig,
+}
+
+/// Shared parameters for the individual local-speed motor tests.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MotorTestMissionConfig {
+    /// Positive normalized speed magnitude, greater than zero and at most one.
+    pub speed: f32,
+}
+
+impl Default for MotorTestMissionConfig {
+    fn default() -> Self {
+        Self { speed: 0.5 }
+    }
 }
 
 /// Parameters for the test mission.
@@ -110,6 +126,7 @@ impl Default for Config {
             placeholder_arm_time: 5,
             cb_path: "/dev/serial/by-id/usb-STMicroelectronics_Control_Board_v2__Virtual_COM_Port__36313632303251010061003C-if00".to_string(),
             missions: MissionsConfig {
+                motor_test: MotorTestMissionConfig::default(),
                 test: TestMissionConfig {
                     down_seconds: 5,
                     forward_seconds: 5,
