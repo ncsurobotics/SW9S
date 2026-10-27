@@ -5,7 +5,7 @@ use crate::{
     missions::tasks::gate_task,
 };
 use bonsai_bt::{
-    Behavior::{Action, After, Race, Sequence, While},
+    Behavior::{Action, After, Race, Sequence, Timeout, While},
     Event,
     Status::{self, Failure, Success},
     Timer, UpdateArgs, BT, RUNNING,
@@ -23,14 +23,19 @@ pub struct SeaWolfState {
     pub see_goal: Option<Receiver<Status>>,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+// Enum of targets to get close to or look at
+pub enum Target {
+    None,
+    Gate,
+    Shark,
+}
+
 // Enum for actions by sea wolf in water
 #[derive(Clone, Debug, PartialEq)]
 pub enum mission_logic {
-    face_towards,
-    is_close,
-    swim,
-    style,
-    gate,
+    face_towards(Target),
+    swim(Target),
 }
 
 // Advances the mission behavior tree by one tick.
@@ -41,16 +46,6 @@ pub async fn run_mission(
     timer: &mut Timer,
     bt: &mut BT<mission_logic, HashMap<String, i32>>,
 ) -> Result<()> {
-    let face_towards = Action(mission_logic::face_towards);
-    let is_close = Action(mission_logic::is_close);
-    let swim = Action(mission_logic::swim);
-    let style = Action(mission_logic::style);
-
-    let move_to = Sequence(vec![
-        Action(face_towards),
-        Race(vec![Action(swim), Action(is_close)]),
-    ]);
-
     // have bt advance dt seconds into the future
     let dt = timer.get_dt();
 
@@ -60,31 +55,34 @@ pub async fn run_mission(
     // Update behavior tree
     #[rustfmt::skip]
      bt.tick(&e,&mut |args: bonsai_bt::ActionArgs<Event, mission_logic>, _|
-        match *args.action {
-            mission_logic::face_towards => {
+        match args.action {
+            mission_logic::face_towards(target) => {
                 // Add action to face towards goal
+                let mut goal: bool = false;
+                while(!goal) {
+                    // Rotate robot
+                    // based on targets update goal
+                    // Alternative Option is having seegoal as part of sea wolf state
+                    // Then we would have updating see wolf state be its own mission logic
+                }
                 (Status::Success, args.dt)
             },
-            mission_logic::swim => {
+            mission_logic::swim(target) => {
+                // Alternative to face towards listed below
                 // Add action to swim
-                (Status::Success, args.dt)
-            },
-            mission_logic::style => {
-                // Add action to style
-                (Status::Success, args.dt)
-            }
-            mission_logic::gate => {
                 let gate_state: &Option<Receiver<Status>> = &state.see_goal;
                 if let Some(gate_status) = gate_state {
                     match gate_status.recv() {
                         Ok(status) => {
                             match status {
                                 Success => {
-                                    // Add action if see sharks, preferably turns see_sharks to none
+                                    // do nothing just say success
                                     (Status::Success, args.dt)
                                 },
                                 Failure => {
-                                    // Add action if see sharks
+                                    // back up
+                                    // rotate until see target
+                                    // rerun swim
                                     state.see_goal = None;
                                     (Status::Failure, args.dt)
                                 },

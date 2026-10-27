@@ -24,7 +24,7 @@ use crate::{
 };
 
 use bonsai_bt::{
-    Behavior::{Action, After, Race, Sequence, While},
+    Behavior::{Action, After, Race, Sequence, Timeout, While},
     Timer, BT,
 };
 use std::{collections::HashMap, time::Duration};
@@ -61,9 +61,30 @@ async fn run(args: RunArgs) -> Result<()> {
 
     let mut timer = Timer::init_time();
 
+    let gate: bonsai_bt::Behavior<missions::mission_logic> = Sequence(vec![
+        Action(missions::mission_logic::face_towards(
+            missions::Target::Gate,
+        )),
+        Timeout(
+            10.0,
+            Box::new(Action(missions::mission_logic::swim(
+                missions::Target::Shark,
+            ))),
+        ),
+        Action(missions::mission_logic::face_towards(
+            missions::Target::Shark,
+        )),
+        Timeout(
+            10.0,
+            Box::new(Action(missions::mission_logic::swim(
+                missions::Target::None,
+            ))),
+        ),
+    ]);
+
     for mission in args.missions {
         let blackboard: HashMap<String, i32> = HashMap::new();
-        let mut behavior = Action(missions::mission_logic::gate);
+        let behavior = gate.clone();
         mission_result = run_mission(
             &mission,
             &mut state,
