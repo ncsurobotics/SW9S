@@ -33,3 +33,18 @@ pub async fn face_task(tx: Sender<Status>, target: &Target) {
         }
     }
 }
+
+pub async fn style_task(tx: Sender<Status>) {
+    // Add Functionality for style
+    // Success only indicates shark seen and does not indicate style fully completed
+    let cd = control_board().await.unwrap();
+    let _ = cd
+        .relative_dof_speed_set(0.0, 1.0, 0.0, 1.0, 0.0, 0.0)
+        .await;
+    loop {
+        if (lookfor(&Target::Arrow)) {
+            tx.send(Status::Success).unwrap();
+            break;
+        }
+    }
+}

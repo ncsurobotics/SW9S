@@ -2,7 +2,7 @@
 
 use crate::{
     logging::{info, Result},
-    missions::tasks::{face_task, swim_task},
+    missions::tasks::{face_task, style_task, swim_task},
 };
 use bonsai_bt::{
     Event,
@@ -27,6 +27,7 @@ pub enum Target {
     None,
     Gate,
     Shark,
+    Arrow,
 }
 
 // Enum for actions by sea wolf in water
@@ -34,6 +35,7 @@ pub enum Target {
 pub enum MissionLogic {
     FaceTowards(Target),
     Swim(Target),
+    Style,
 }
 
 // Advances the mission behavior tree by one tick.
@@ -119,6 +121,42 @@ pub async fn run_mission(
                 } else {
                     let (tx, rx) = channel();
                     swim_task(tx, target);
+                    state.see_goal = Some(rx);
+                    let receiver = state.see_goal.as_ref().unwrap();
+                    let status = receiver.recv().unwrap();
+                    (status, args.dt)
+                }
+            },
+            MissionLogic::Style => {
+                // Alternative to face towards listed below
+                // Add action to swim
+                let style_state: &Option<Receiver<Status>> = &state.see_goal;
+                if let Some(style_status) = style_state {
+                    match style_status.recv() {
+                        Ok(status) => {
+                            match status {
+                                Status::Success => {
+                                    // do nothing just say success
+                                    (Status::Success, args.dt)
+                                },
+                                Status::Failure => {
+                                    // back up
+                                    // rotate until see target
+                                    // rerun swim
+                                    state.see_goal = None;
+                                    (Status::Failure, args.dt)
+                                },
+                                Status::Running => RUNNING,
+                            }
+                        },
+                        Err(_) => {
+                            state.see_goal = None;
+                            (Status::Failure, args.dt)
+                        },
+                    }
+                } else {
+                    let (tx, rx) = channel();
+                    style_task(tx);
                     state.see_goal = Some(rx);
                     let receiver = state.see_goal.as_ref().unwrap();
                     let status = receiver.recv().unwrap();

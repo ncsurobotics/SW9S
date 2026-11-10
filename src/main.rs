@@ -70,10 +70,7 @@ async fn run(args: RunArgs) -> Result<()> {
             ))),
         ),
         Action(missions::MissionLogic::FaceTowards(missions::Target::Shark)),
-        Timeout(
-            10.0,
-            Box::new(Action(missions::MissionLogic::Swim(missions::Target::None))),
-        ),
+        Timeout(10.0, Box::new(Action(missions::MissionLogic::Style))),
     ]);
 
     let missions = Sequence(vec![gate.clone(), gate.clone()]);
