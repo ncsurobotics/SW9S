@@ -1,14 +1,35 @@
+use crate::comms::control_board;
+use crate::missions::Target;
 use bonsai_bt::Status;
 use std::sync::mpsc::Sender;
-use std::thread::sleep;
-use std::time::Duration;
 
-pub async fn swim_task(tx: Sender<Status>) {
+use crate::missions::visions_options::lookfor;
+
+pub async fn swim_task(tx: Sender<Status>, target: &Target) {
     // Add Functionality for swim
     // Success only indicates shark seen and does not indicate swim fully completed
+    let _ = control_board()
+        .await
+        .unwrap()
+        .stability_2_speed_set(0.0, 1.0, 0.0, 0.0, 0.0, 0.0)
+        .await;
     loop {
-        sleep(Duration::from_secs(5));
-        break;
+        if lookfor(target) {
+            tx.send(Status::Success).unwrap();
+            return;
+        }
     }
-    tx.send(Status::Success).unwrap();
+}
+
+pub async fn face_task(tx: Sender<Status>, target: &Target) {
+    // Add Functionality for face
+    // Success only indicates shark seen and does not indicate face fully completed
+    let cd = control_board().await.unwrap();
+    let _ = cd.stability_1_speed_set(0.0, 0.0, 1.0, 0.0, 0.0, 0.0).await;
+    loop {
+        if lookfor(target) {
+            tx.send(Status::Success).unwrap();
+            break;
+        }
+    }
 }

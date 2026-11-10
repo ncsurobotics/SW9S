@@ -19,12 +19,12 @@ use crate::{
     cli::{CfgSubcmd, Cli, Parser, RunArgs, Subcmd},
     comms::control_board,
     config::Config,
-    logging::{debug, error, info, instrument, Result},
+    logging::{debug, info, instrument, Result},
     missions::{run_mission, SeaWolfState},
 };
 
 use bonsai_bt::{
-    Behavior::{Action, After, Race, Sequence, Timeout, While},
+    Behavior::{Action, Sequence, Timeout},
     Timer, BT,
 };
 use std::{collections::HashMap, time::Duration};
@@ -55,30 +55,24 @@ async fn run(args: RunArgs) -> Result<()> {
     let shutdown_token = CancellationToken::new();
     let shutdown_handler_task = spawn(shutdown_handler(shutdown_token.clone()));
     let arm_handler_task = spawn(arm_handler(shutdown_token.clone()));
-    let mut mission_result = Ok(());
+    let mut mission_result: Result<()> = Ok(());
 
     let mut state = SeaWolfState { see_goal: None };
 
     let mut timer = Timer::init_time();
 
-    let gate: bonsai_bt::Behavior<missions::mission_logic> = Sequence(vec![
-        Action(missions::mission_logic::face_towards(
-            missions::Target::Gate,
-        )),
+    let gate: bonsai_bt::Behavior<missions::MissionLogic> = Sequence(vec![
+        Action(missions::MissionLogic::FaceTowards(missions::Target::Gate)),
         Timeout(
             10.0,
-            Box::new(Action(missions::mission_logic::swim(
+            Box::new(Action(missions::MissionLogic::Swim(
                 missions::Target::Shark,
             ))),
         ),
-        Action(missions::mission_logic::face_towards(
-            missions::Target::Shark,
-        )),
+        Action(missions::MissionLogic::FaceTowards(missions::Target::Shark)),
         Timeout(
             10.0,
-            Box::new(Action(missions::mission_logic::swim(
-                missions::Target::None,
-            ))),
+            Box::new(Action(missions::MissionLogic::Swim(missions::Target::None))),
         ),
     ]);
 

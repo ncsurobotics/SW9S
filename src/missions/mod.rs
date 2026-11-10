@@ -1,21 +1,19 @@
 //! Dispatches named missions and handles cancellation during execution.
 
 use crate::{
-    logging::{bail, error, eyre, info, Result},
-    missions::tasks::swim_task,
+    logging::{info, Result},
+    missions::tasks::{face_task, swim_task},
 };
 use bonsai_bt::{
-    Behavior::{Action, After, Race, Sequence, Timeout, While},
     Event,
-    Status::{self, Failure, Success},
+    Status::{self},
     Timer, UpdateArgs, BT, RUNNING,
 };
 use std::collections::HashMap;
 use std::result::Result::Ok;
 use std::sync::mpsc::{channel, Receiver};
 mod tasks;
-
-use tokio_util::sync::CancellationToken;
+mod visions_options;
 
 // States sea wolf can be in
 #[derive(Debug)]
@@ -33,9 +31,9 @@ pub enum Target {
 
 // Enum for actions by sea wolf in water
 #[derive(Clone, Debug, PartialEq)]
-pub enum mission_logic {
-    face_towards(Target),
-    swim(Target),
+pub enum MissionLogic {
+    FaceTowards(Target),
+    Swim(Target),
 }
 
 // Advances the mission behavior tree by one tick.
@@ -43,7 +41,7 @@ pub enum mission_logic {
 pub async fn run_mission(
     state: &mut SeaWolfState,
     timer: &mut Timer,
-    bt: &mut BT<mission_logic, HashMap<String, i32>>,
+    bt: &mut BT<MissionLogic, HashMap<String, i32>>,
 ) -> Result<()> {
     // have bt advance dt seconds into the future
     let dt = timer.get_dt();
@@ -53,32 +51,21 @@ pub async fn run_mission(
 
     // Update behavior tree
     #[rustfmt::skip]
-     bt.tick(&e,&mut |args: bonsai_bt::ActionArgs<Event, mission_logic>, _|
+     bt.tick(&e,&mut |args: bonsai_bt::ActionArgs<Event, MissionLogic>, _|
         match args.action {
-            mission_logic::face_towards(target) => {
-                // Add action to face towards goal
-                let mut goal: bool = false;
-                while(!goal) {
-                    // Rotate robot
-                    // based on targets update goal
-                    // Alternative Option is having seegoal as part of sea wolf state
-                    // Then we would have updating see wolf state be its own mission logic
-                }
-                (Status::Success, args.dt)
-            },
-            mission_logic::swim(target) => {
-                // Alternative to face towards listed below
+            MissionLogic::FaceTowards(target) => {
+                 // Alternative to face towards listed below
                 // Add action to swim
-                let gate_state: &Option<Receiver<Status>> = &state.see_goal;
-                if let Some(gate_status) = gate_state {
-                    match gate_status.recv() {
+                let face_state: &Option<Receiver<Status>> = &state.see_goal;
+                if let Some(face_status) = face_state {
+                    match face_status.recv() {
                         Ok(status) => {
                             match status {
-                                Success => {
+                                Status::Success => {
                                     // do nothing just say success
                                     (Status::Success, args.dt)
                                 },
-                                Failure => {
+                                Status::Failure => {
                                     // back up
                                     // rotate until see target
                                     // rerun swim
@@ -95,17 +82,49 @@ pub async fn run_mission(
                     }
                 } else {
                     let (tx, rx) = channel();
-                    swim_task(tx);
+                    face_task(tx, target);
+                    state.see_goal = Some(rx);
+                    let receiver = state.see_goal.as_ref().unwrap();
+                    let status = receiver.recv().unwrap();
+                    (status, args.dt)
+                }
+            },
+            MissionLogic::Swim(target) => {
+                // Alternative to face towards listed below
+                // Add action to swim
+                let swim_state: &Option<Receiver<Status>> = &state.see_goal;
+                if let Some(swim_status) = swim_state {
+                    match swim_status.recv() {
+                        Ok(status) => {
+                            match status {
+                                Status::Success => {
+                                    // do nothing just say success
+                                    (Status::Success, args.dt)
+                                },
+                                Status::Failure => {
+                                    // back up
+                                    // rotate until see target
+                                    // rerun swim
+                                    state.see_goal = None;
+                                    (Status::Failure, args.dt)
+                                },
+                                Status::Running => RUNNING,
+                            }
+                        },
+                        Err(_) => {
+                            state.see_goal = None;
+                            (Status::Failure, args.dt)
+                        },
+                    }
+                } else {
+                    let (tx, rx) = channel();
+                    swim_task(tx, target);
                     state.see_goal = Some(rx);
                     let receiver = state.see_goal.as_ref().unwrap();
                     let status = receiver.recv().unwrap();
                     (status, args.dt)
                 }
             }
-            _ => {
-                error!("Unknown mission");
-                (Status::Failure, args.dt)
-        }
         }
      );
 
