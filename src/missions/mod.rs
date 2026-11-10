@@ -2,7 +2,7 @@
 
 use crate::{
     logging::{bail, error, eyre, info, Result},
-    missions::tasks::gate_task,
+    missions::tasks::swim_task,
 };
 use bonsai_bt::{
     Behavior::{Action, After, Race, Sequence, Timeout, While},
@@ -41,7 +41,6 @@ pub enum mission_logic {
 // Advances the mission behavior tree by one tick.
 // IDK how to use showdown token thing so for now just skip it
 pub async fn run_mission(
-    name: &str,
     state: &mut SeaWolfState,
     timer: &mut Timer,
     bt: &mut BT<mission_logic, HashMap<String, i32>>,
@@ -96,7 +95,7 @@ pub async fn run_mission(
                     }
                 } else {
                     let (tx, rx) = channel();
-                    gate_task(tx);
+                    swim_task(tx);
                     state.see_goal = Some(rx);
                     let receiver = state.see_goal.as_ref().unwrap();
                     let status = receiver.recv().unwrap();
@@ -104,12 +103,12 @@ pub async fn run_mission(
                 }
             }
             _ => {
-                error!("Unknown mission: {name}");
+                error!("Unknown mission");
                 (Status::Failure, args.dt)
         }
         }
      );
 
-    info!("Running {name}");
+    info!("Running mission");
     Ok(())
 }

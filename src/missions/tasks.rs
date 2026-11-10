@@ -3,9 +3,9 @@ use std::sync::mpsc::Sender;
 use std::thread::sleep;
 use std::time::Duration;
 
-pub async fn gate_task(tx: Sender<Status>) {
-    // Add Functionality for gate
-    // Success only indicates shark seen and does not indicate gate fully gone through
+pub async fn swim_task(tx: Sender<Status>) {
+    // Add Functionality for swim
+    // Success only indicates shark seen and does not indicate swim fully completed
     loop {
         sleep(Duration::from_secs(5));
         break;

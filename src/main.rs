@@ -82,21 +82,16 @@ async fn run(args: RunArgs) -> Result<()> {
         ),
     ]);
 
-    for mission in args.missions {
-        let blackboard: HashMap<String, i32> = HashMap::new();
-        let behavior = gate.clone();
-        mission_result = run_mission(
-            &mission,
-            &mut state,
-            &mut timer,
-            &mut BT::new(behavior, blackboard),
-        )
-        .await;
-        if mission_result.is_err() {
-            error!("Halting mission execution");
-            break;
-        }
-    }
+    let missions = Sequence(vec![gate.clone(), gate.clone()]);
+
+    let blackboard: HashMap<String, i32> = HashMap::new();
+    let behavior = missions.clone();
+    mission_result = run_mission(&mut state, &mut timer, &mut BT::new(behavior, blackboard)).await;
+    // TODO: add to missions
+    // if mission_result.is_err() {
+    //     error!("Halting mission execution");
+    //     break;
+    // }
 
     if !shutdown_token.is_cancelled() {
         info!("Mission execution finished, signaling shutdown");
