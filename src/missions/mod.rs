@@ -28,7 +28,7 @@ pub enum Target {
     SlalomWhite,
     SlalomRed,
     Shark,
-    Arrow,
+    Path,
 }
 
 // Enum for actions by sea wolf in water
@@ -55,7 +55,8 @@ pub async fn run_mission(
         let result = bt.tick(&event, &mut |args: bonsai_bt::ActionArgs<
             Event,
             MissionLogic,
-        >, _| {
+        >,
+                                           _| {
             match args.action {
                 MissionLogic::FaceTowards(target) => {
                     start_task_if_needed(state, |tx| face_task(tx, target.clone()));
