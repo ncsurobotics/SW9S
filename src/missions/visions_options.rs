@@ -4,6 +4,8 @@ pub fn lookfor(target: &Target) -> bool {
     match target {
         Target::Gate => true,
         Target::Shark => true,
-        _ => false,
+        Target::SlalomWhite => true,
+        Target::SlalomRed => true,
+        _ => true,
     }
 }

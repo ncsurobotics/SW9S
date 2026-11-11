@@ -55,8 +55,6 @@ async fn run(args: RunArgs) -> Result<()> {
     let shutdown_token = CancellationToken::new();
     let shutdown_handler_task = spawn(shutdown_handler(shutdown_token.clone()));
     let arm_handler_task = spawn(arm_handler(shutdown_token.clone()));
-    let mut mission_result: Result<()> = Ok(());
-
     let mut state = SeaWolfState { see_goal: None };
 
     let mut timer = Timer::init_time();
@@ -64,20 +62,40 @@ async fn run(args: RunArgs) -> Result<()> {
     let gate: bonsai_bt::Behavior<missions::MissionLogic> = Sequence(vec![
         Action(missions::MissionLogic::FaceTowards(missions::Target::Gate)),
         Timeout(
-            10.0,
+            1.0,
             Box::new(Action(missions::MissionLogic::Swim(
                 missions::Target::Shark,
             ))),
         ),
         Action(missions::MissionLogic::FaceTowards(missions::Target::Shark)),
-        Timeout(10.0, Box::new(Action(missions::MissionLogic::Style))),
+        Timeout(1.0, Box::new(Action(missions::MissionLogic::Style))),
     ]);
 
-    let missions = Sequence(vec![gate.clone(), gate.clone()]);
+    let slolam: bonsai_bt::Behavior<missions::MissionLogic> = Sequence(vec![
+        Action(missions::MissionLogic::FaceTowards(
+            missions::Target::SlalomWhite,
+        )),
+        Timeout(
+            1.0,
+            Box::new(Action(missions::MissionLogic::Swim(
+                missions::Target::SlalomRed,
+            ))),
+        ),
+        Action(missions::MissionLogic::FaceTowards(
+            missions::Target::SlalomWhite,
+        )),
+        Timeout(
+            1.0,
+            Box::new(Action(missions::MissionLogic::Swim(missions::Target::None))),
+        ),
+    ]);
+
+    let missions = Sequence(vec![gate.clone(), slolam.clone()]);
 
     let blackboard: HashMap<String, i32> = HashMap::new();
     let behavior = missions.clone();
-    mission_result = run_mission(&mut state, &mut timer, &mut BT::new(behavior, blackboard)).await;
+    let mission_result =
+        run_mission(&mut state, &mut timer, &mut BT::new(behavior, blackboard)).await;
     // TODO: add to missions
     // if mission_result.is_err() {
     //     error!("Halting mission execution");

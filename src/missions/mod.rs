@@ -4,14 +4,13 @@ use crate::{
     logging::{info, Result},
     missions::tasks::{face_task, style_task, swim_task},
 };
-use bonsai_bt::{
-    Event,
-    Status::{self},
-    Timer, UpdateArgs, BT, RUNNING,
-};
+use bonsai_bt::{Event, Status, Timer, UpdateArgs, BT, RUNNING};
 use std::collections::HashMap;
-use std::result::Result::Ok;
-use std::sync::mpsc::{channel, Receiver};
+use std::sync::mpsc::{channel, Receiver, TryRecvError};
+use tokio::{
+    spawn,
+    time::{sleep, Duration},
+};
 mod tasks;
 mod visions_options;
 
@@ -26,6 +25,8 @@ pub struct SeaWolfState {
 pub enum Target {
     None,
     Gate,
+    SlalomWhite,
+    SlalomRed,
     Shark,
     Arrow,
 }
@@ -45,127 +46,66 @@ pub async fn run_mission(
     timer: &mut Timer,
     bt: &mut BT<MissionLogic, HashMap<String, i32>>,
 ) -> Result<()> {
-    // have bt advance dt seconds into the future
-    let dt = timer.get_dt();
-
-    // proceed to next iteration in event loop
-    let e: Event = UpdateArgs { dt }.into();
-
-    // Update behavior tree
-    #[rustfmt::skip]
-     bt.tick(&e,&mut |args: bonsai_bt::ActionArgs<Event, MissionLogic>, _|
-        match args.action {
-            MissionLogic::FaceTowards(target) => {
-                 // Alternative to face towards listed below
-                // Add action to swim
-                let face_state: &Option<Receiver<Status>> = &state.see_goal;
-                if let Some(face_status) = face_state {
-                    match face_status.recv() {
-                        Ok(status) => {
-                            match status {
-                                Status::Success => {
-                                    // do nothing just say success
-                                    (Status::Success, args.dt)
-                                },
-                                Status::Failure => {
-                                    // back up
-                                    // rotate until see target
-                                    // rerun swim
-                                    state.see_goal = None;
-                                    (Status::Failure, args.dt)
-                                },
-                                Status::Running => RUNNING,
-                            }
-                        },
-                        Err(_) => {
-                            state.see_goal = None;
-                            (Status::Failure, args.dt)
-                        },
-                    }
-                } else {
-                    let (tx, rx) = channel();
-                    face_task(tx, target);
-                    state.see_goal = Some(rx);
-                    let receiver = state.see_goal.as_ref().unwrap();
-                    let status = receiver.recv().unwrap();
-                    (status, args.dt)
+    info!("Running mission");
+    // Bonsai advances through a behavior tree one tick at a time. Keep
+    // ticking while an async mission task is running.
+    loop {
+        let dt = timer.get_dt();
+        let event: Event = UpdateArgs { dt }.into();
+        let result = bt.tick(&event, &mut |args: bonsai_bt::ActionArgs<
+            Event,
+            MissionLogic,
+        >, _| {
+            match args.action {
+                MissionLogic::FaceTowards(target) => {
+                    start_task_if_needed(state, |tx| face_task(tx, target.clone()));
+                    poll_task(state, args.dt)
                 }
-            },
-            MissionLogic::Swim(target) => {
-                // Alternative to face towards listed below
-                // Add action to swim
-                let swim_state: &Option<Receiver<Status>> = &state.see_goal;
-                if let Some(swim_status) = swim_state {
-                    match swim_status.recv() {
-                        Ok(status) => {
-                            match status {
-                                Status::Success => {
-                                    // do nothing just say success
-                                    (Status::Success, args.dt)
-                                },
-                                Status::Failure => {
-                                    // back up
-                                    // rotate until see target
-                                    // rerun swim
-                                    state.see_goal = None;
-                                    (Status::Failure, args.dt)
-                                },
-                                Status::Running => RUNNING,
-                            }
-                        },
-                        Err(_) => {
-                            state.see_goal = None;
-                            (Status::Failure, args.dt)
-                        },
-                    }
-                } else {
-                    let (tx, rx) = channel();
-                    swim_task(tx, target);
-                    state.see_goal = Some(rx);
-                    let receiver = state.see_goal.as_ref().unwrap();
-                    let status = receiver.recv().unwrap();
-                    (status, args.dt)
+                MissionLogic::Swim(target) => {
+                    start_task_if_needed(state, |tx| swim_task(tx, target.clone(), 1.0));
+                    poll_task(state, args.dt)
                 }
-            },
-            MissionLogic::Style => {
-                // Alternative to face towards listed below
-                // Add action to swim
-                let style_state: &Option<Receiver<Status>> = &state.see_goal;
-                if let Some(style_status) = style_state {
-                    match style_status.recv() {
-                        Ok(status) => {
-                            match status {
-                                Status::Success => {
-                                    // do nothing just say success
-                                    (Status::Success, args.dt)
-                                },
-                                Status::Failure => {
-                                    // back up
-                                    // rotate until see target
-                                    // rerun swim
-                                    state.see_goal = None;
-                                    (Status::Failure, args.dt)
-                                },
-                                Status::Running => RUNNING,
-                            }
-                        },
-                        Err(_) => {
-                            state.see_goal = None;
-                            (Status::Failure, args.dt)
-                        },
-                    }
-                } else {
-                    let (tx, rx) = channel();
-                    style_task(tx);
-                    state.see_goal = Some(rx);
-                    let receiver = state.see_goal.as_ref().unwrap();
-                    let status = receiver.recv().unwrap();
-                    (status, args.dt)
+                MissionLogic::Style => {
+                    start_task_if_needed(state, style_task);
+                    poll_task(state, args.dt)
                 }
             }
-        }
-     );
+        });
 
-    info!("Running mission");
-    Ok(())
+        match result {
+            Some((Status::Running, _)) => sleep(Duration::from_millis(10)).await,
+            Some((Status::Success, _)) => return Ok(()),
+            Some((Status::Failure, _)) => {
+                return Err(color_eyre::eyre::eyre!("Mission behavior tree failed"));
+            }
+            None => return Err(color_eyre::eyre::eyre!("Mission behavior tree stopped")),
+        }
+    }
+}
+
+fn start_task_if_needed<F, Fut>(state: &mut SeaWolfState, task: F)
+where
+    F: FnOnce(std::sync::mpsc::Sender<Status>) -> Fut,
+    Fut: std::future::Future<Output = ()> + Send + 'static,
+{
+    if state.see_goal.is_none() {
+        let (tx, rx) = channel();
+        spawn(task(tx));
+        state.see_goal = Some(rx);
+    }
+}
+
+fn poll_task(state: &mut SeaWolfState, dt: f64) -> (Status, f64) {
+    let receiver = state.see_goal.as_ref().expect("task receiver missing");
+    match receiver.try_recv() {
+        Ok(status) => {
+            state.see_goal = None;
+            (status, dt)
+        }
+        Err(TryRecvError::Empty) => RUNNING,
+        Err(TryRecvError::Disconnected) => {
+            state.see_goal = None;
+            (Status::Failure, dt)
+        }
+    }
 }
