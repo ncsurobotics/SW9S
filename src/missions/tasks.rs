@@ -32,11 +32,8 @@ pub async fn swim_task(tx: Sender<Status>, target: Target, direction: f32) {
 pub async fn face_task(tx: Sender<Status>, target: Target) {
     // Add Functionality for face
     // Success only indicates shark seen and does not indicate face fully completed
-    let _ = control_board()
-        .await
-        .unwrap()
-        .stability_1_speed_set(0.0, 0.0, 1.0, 0.0, 0.0, 0.0)
-        .await;
+    let cd = control_board().await.unwrap();
+    let _ = cd.stability_1_speed_set(0.0, 0.0, 1.0, 0.0, 0.0, 0.0).await;
     let _ = tx.send(wait_for_target(&target).await);
 }
 
